@@ -1,0 +1,231 @@
+/* ─────────────────────────────────────────────────────────────
+   Dhan Design System — Colors & Type
+   Mobile-first personal finance app for urban Gen Z / Millennials
+   in India. Mellow, trustworthy, minimal.
+   ───────────────────────────────────────────────────────────── */
+
+@font-face {
+  font-family: "Poppins";
+  src: url("fonts/Poppins-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Poppins";
+  src: url("fonts/Poppins-SemiBold.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Poppins";
+  src: url("fonts/Poppins-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* ── Brand ───────────────────────────────────────────────── */
+  --dhan-navy:        #141C41;   /* primary — deep navy */
+  --dhan-navy-80:     #2A3158;
+  --dhan-navy-60:     #6A7091;
+  --dhan-navy-40:     #A8ACC1;
+  --dhan-navy-20:     #D4D6E0;
+  --dhan-navy-10:     #E8EAF0;
+  --dhan-navy-05:     #F3F4F8;
+
+  --dhan-gold:        #C9A84C;   /* secondary — mellow gold */
+  --dhan-gold-soft:   #FED977;   /* warm accent (from logo) */
+  --dhan-gold-bg:     #FBF5E3;   /* tinted surface */
+
+  /* ── Surfaces ────────────────────────────────────────────── */
+  --bg-base:          #FFFFFF;
+  --bg-surface:       #F5F6FA;   /* canvas / app background */
+  --bg-elevated:      #FFFFFF;   /* cards on tinted canvas */
+  --bg-overlay:       rgba(20, 28, 65, 0.48);
+
+  /* ── Foreground (text + icon) ────────────────────────────── */
+  --fg-1:             #141C41;   /* primary text */
+  --fg-2:             #4A5172;   /* secondary text */
+  --fg-3:             #8A90A8;   /* tertiary / placeholder */
+  --fg-4:             #B8BCCB;   /* disabled / hint */
+  --fg-on-dark:       #FFFFFF;
+  --fg-on-gold:       #141C41;
+
+  /* ── Borders / dividers ──────────────────────────────────── */
+  --border-subtle:    #EEF0F5;
+  --border-default:   #E1E3EC;
+  --border-strong:    #C6CAD8;
+
+  /* ── Semantic (finance-appropriate, desaturated) ─────────── */
+  --income:           #2E7D5B;   /* money in — green */
+  --income-bg:        #E6F2EC;
+  --expense:          #C94A3B;   /* money out — red  */
+  --expense-bg:       #FBEAE7;
+  --warning:          #D89838;   /* bills due soon */
+  --warning-bg:       #FBF2DF;
+  --info:             #3B6FD4;
+  --info-bg:          #E6EEFB;
+
+  /* Category accents — used for budget/expense category chips.
+     Tuned to feel calm next to navy, not Skittle-bright. */
+  --cat-food:         #E88B5C;
+  --cat-transport:    #6A8FD4;
+  --cat-shopping:     #C97BB6;
+  --cat-bills:        #7C9B5F;
+  --cat-ent:          #B079D9;
+  --cat-health:       #5CB4A8;
+  --cat-education:    #D4A84C;
+  --cat-other:        #8A90A8;
+
+  /* ── Type tokens ─────────────────────────────────────────── */
+  --font-sans: "Poppins", ui-sans-serif, system-ui, -apple-system,
+               "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-num:  "Poppins", ui-sans-serif, system-ui, sans-serif;
+
+  --fw-regular: 400;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  /* Type scale (mobile-first, 390px reference).
+     Tracks are tightened at display sizes. */
+  --t-display-size: 32px;  --t-display-lh: 40px;  --t-display-tr: -0.02em;
+  --t-h1-size:      24px;  --t-h1-lh:      32px;  --t-h1-tr:      -0.01em;
+  --t-h2-size:      20px;  --t-h2-lh:      28px;  --t-h2-tr:      -0.005em;
+  --t-h3-size:      18px;  --t-h3-lh:      26px;  --t-h3-tr:       0;
+  --t-body-size:    15px;  --t-body-lh:    22px;  --t-body-tr:     0;
+  --t-body-sm-size: 13px;  --t-body-sm-lh: 20px;  --t-body-sm-tr:  0;
+  --t-caption-size: 12px;  --t-caption-lh: 16px;  --t-caption-tr:  0.01em;
+  --t-label-size:   11px;  --t-label-lh:   14px;  --t-label-tr:    0.06em;
+
+  /* Currency display — lock tabular nums for alignment */
+  --num-features: "tnum" 1, "lnum" 1;
+
+  /* ── Radii ───────────────────────────────────────────────── */
+  --r-xs:  4px;
+  --r-sm:  8px;    /* inputs */
+  --r-md:  12px;   /* buttons, small cards */
+  --r-lg:  16px;   /* cards */
+  --r-xl:  20px;
+  --r-2xl: 24px;   /* modals, bottom sheets */
+  --r-pill: 999px;
+
+  /* Shape language — driven by the Tweaks "Shape" control */
+  --r-input:   8px;
+  --r-control: 12px;
+  --r-card-sm: 14px;
+  --r-card:    16px;
+  --r-card-lg: 20px;
+  --r-sheet:   24px;
+  --r-icon:    30%;
+
+  /* Material — driven by the Tweaks "Depth" control */
+  --card-border-color: transparent;
+  --app-bg: #EDEEF4;
+  --dhan-ink: #0E1432;
+
+  /* ── Spacing (8px grid; 4px half-step allowed) ──────────── */
+  --s-0:  0;
+  --s-1:  4px;
+  --s-2:  8px;
+  --s-3:  12px;
+  --s-4:  16px;
+  --s-5:  20px;
+  --s-6:  24px;
+  --s-7:  32px;
+  --s-8:  40px;
+  --s-9:  48px;
+  --s-10: 64px;
+
+  /* ── Elevation ───────────────────────────────────────────── */
+  --shadow-xs:  0 1px 2px rgba(20, 28, 65, 0.05);
+  --shadow-sm:  0 2px 6px rgba(20, 28, 65, 0.06);
+  --shadow-md:  0 6px 16px rgba(20, 28, 65, 0.08);
+  --shadow-lg:  0 12px 32px rgba(20, 28, 65, 0.12);
+  --shadow-card: 0 2px 8px rgba(20, 28, 65, 0.04),
+                 0 1px 2px rgba(20, 28, 65, 0.03);
+
+  /* ── Motion ──────────────────────────────────────────────── */
+  --ease-out:    cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.28, 0.64, 1);
+  --dur-fast:    120ms;
+  --dur-base:    200ms;
+  --dur-slow:    320ms;
+
+  /* ── Layout ──────────────────────────────────────────────── */
+  --app-max-w: 390px;           /* primary mobile target */
+  --tabbar-h:  76px;
+  --statusbar-h: 44px;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Semantic element styles (opt-in by class, not global reset)
+   ───────────────────────────────────────────────────────────── */
+
+.ds-display, h1.ds, .ds h1 {
+  font: var(--fw-bold) var(--t-display-size)/var(--t-display-lh) var(--font-sans);
+  letter-spacing: var(--t-display-tr);
+  color: var(--fg-1);
+  margin: 0;
+}
+.ds-h1 {
+  font: var(--fw-bold) var(--t-h1-size)/var(--t-h1-lh) var(--font-sans);
+  letter-spacing: var(--t-h1-tr);
+  color: var(--fg-1);
+}
+.ds-h2 {
+  font: var(--fw-semibold) var(--t-h2-size)/var(--t-h2-lh) var(--font-sans);
+  letter-spacing: var(--t-h2-tr);
+  color: var(--fg-1);
+}
+.ds-h3 {
+  font: var(--fw-semibold) var(--t-h3-size)/var(--t-h3-lh) var(--font-sans);
+  color: var(--fg-1);
+}
+.ds-body {
+  font: var(--fw-regular) var(--t-body-size)/var(--t-body-lh) var(--font-sans);
+  color: var(--fg-1);
+}
+.ds-body-sm {
+  font: var(--fw-regular) var(--t-body-sm-size)/var(--t-body-sm-lh) var(--font-sans);
+  color: var(--fg-2);
+}
+.ds-caption {
+  font: var(--fw-regular) var(--t-caption-size)/var(--t-caption-lh) var(--font-sans);
+  letter-spacing: var(--t-caption-tr);
+  color: var(--fg-3);
+}
+.ds-label {
+  font: var(--fw-semibold) var(--t-label-size)/var(--t-label-lh) var(--font-sans);
+  letter-spacing: var(--t-label-tr);
+  text-transform: uppercase;
+  color: var(--fg-2);
+}
+.ds-num {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: var(--num-features);
+}
+.ds-currency-big {
+  font: var(--fw-bold) var(--t-display-size)/var(--t-display-lh) var(--font-sans);
+  letter-spacing: var(--t-display-tr);
+  font-variant-numeric: tabular-nums lining-nums;
+  color: var(--fg-1);
+}
+
+/* Outlined gold text-button (tappable gold CTAs) */
+.gold-btn{border:1px solid var(--dhan-gold)!important;border-radius:8px!important;padding:8px 16px!important;background:rgba(201,168,76,.14)!important;color:var(--dhan-gold)!important;font-family:Poppins,sans-serif;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;line-height:1;height:auto!important;white-space:nowrap}
+.gold-btn:hover{background:rgba(201,168,76,.24)!important}
+
+@keyframes toastDrop{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:translateY(0)}}
+
+/* Contact photo slots sit invisibly over the initials circle: empty = initials show through, filled = photo */
+.contact-slot{position:absolute;inset:0;cursor:pointer}
+.contact-slot::part(empty){display:none}
+.contact-slot::part(ring){display:none}
+
+/* Budget cards: whole card is the accordion trigger */
+.budget-card{transition:background .15s var(--ease-out),border-color .15s var(--ease-out)}
+.budget-card:hover{background:rgba(201,168,76,.06)!important;border-color:rgba(201,168,76,.4)!important}

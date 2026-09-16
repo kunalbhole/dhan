@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dhan · Interactive Prototype</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="colors_and_type.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<style>
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--app-bg, #EDEEF4);
+    transition: background 320ms var(--ease-out);
+    font-family: "Poppins", sans-serif;
+    color: var(--fg-1);
+    min-height: 100vh;
+  }
+  * { box-sizing: border-box; }
+  button { font-family: "Poppins", sans-serif; }
+  input, textarea { font-family: "Poppins", sans-serif; }
+
+  .stage-wrap {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+  }
+
+  /* Scrollbar polish inside phone */
+  .phone-scroll::-webkit-scrollbar { width: 0; height: 0; }
+  .phone-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+
+  /* Fade-in animation */
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .screen-in { animation: fadeSlideIn 280ms var(--ease-out) both; }
+
+  /* Tweak changes morph rather than snap. Inline transitions (button
+     press scales, bar fills) keep priority over this. */
+  [data-screen-label], [data-screen-label] * {
+    transition: background-color 320ms var(--ease-out),
+                border-color 320ms var(--ease-out),
+                border-radius 320ms var(--ease-out),
+                box-shadow 320ms var(--ease-out),
+                color 200ms var(--ease-out);
+  }
+
+  @keyframes sheetIn {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+  @keyframes scrimIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  .sheet-in { animation: sheetIn 320ms var(--ease-spring) both; }
+  .scrim-in { animation: scrimIn 240ms var(--ease-out) both; }
+
+  @keyframes pulseDot {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.15); opacity: 0.7; }
+  }
+
+  /* side panel (demo controls) */
+  .side {
+    position: fixed; top: 16px; right: 16px;
+    background: #fff; border-radius: 16px; padding: 14px;
+    box-shadow: 0 12px 32px rgba(20,28,65,.12);
+    width: 230px; z-index: 50;
+    font-size: 12px;
+  }
+  .side h4 { margin: 0 0 10px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-3); font-weight: 700; }
+  .side .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .side label { font-weight: 600; color: var(--fg-2); }
+  .side select, .side input[type="text"] {
+    border: 1px solid var(--border-default); border-radius: 8px;
+    padding: 4px 8px; font-size: 12px; font-family: "Poppins";
+    background: #fff;
+  }
+  .side .jump-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .side .jump-grid button {
+    border: 1px solid var(--border-subtle); background: var(--bg-surface);
+    border-radius: 8px; padding: 6px 4px; cursor: pointer;
+    font-size: 11px; font-weight: 600; color: var(--fg-2);
+  }
+  .side .jump-grid button.active { background: var(--dhan-navy); color: #fff; border-color: var(--dhan-navy); }
+
+  /* Tweaks panel */
+  .tweaks-panel {
+    position: fixed; bottom: 16px; right: 16px;
+    background: #fff; border-radius: 16px;
+    box-shadow: 0 16px 40px rgba(20,28,65,.18);
+    width: 260px; z-index: 100;
+    font-size: 12px; overflow: hidden;
+    display: none;
+  }
+  .tweaks-panel.open { display: block; }
+  .tweaks-panel .hd {
+    background: var(--dhan-navy); color: #fff;
+    padding: 12px 14px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-weight: 700; font-size: 13px;
+  }
+  .tweaks-panel .hd button {
+    background: transparent; border: none; color: #fff; cursor: pointer;
+    font-size: 18px; line-height: 1;
+  }
+  .tweaks-panel .body { padding: 14px; max-height: 68vh; overflow-y: auto; }
+  .tweaks-panel .body::-webkit-scrollbar { width: 0; }
+  .tweaks-panel .sect { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; color: var(--fg-4); margin: 2px 0 9px; }
+  .tweaks-panel .sect + .sect { margin-top: 16px; }
+  .tweaks-panel .divider { height: 1px; background: var(--border-subtle); margin: 16px -14px; }
+  .tweaks-panel .ctl { margin-bottom: 14px; }
+  .tweaks-panel .ctl > .cap { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; }
+  .tweaks-panel .ctl .name { font-weight: 700; color: var(--fg-2); font-size: 12px; }
+  .tweaks-panel .ctl .val { font-size: 10.5px; color: var(--fg-4); font-weight: 600; }
+  /* segmented */
+  .seg { display: grid; gap: 3px; background: var(--bg-surface); border-radius: 10px; padding: 3px; }
+  .seg button { border: none; background: transparent; cursor: pointer; font-family: "Poppins"; font-size: 11px; font-weight: 700; color: var(--fg-3); padding: 7px 4px; border-radius: 7px; transition: background .15s, color .15s; }
+  .seg button.on { background: #fff; color: var(--dhan-navy); box-shadow: 0 1px 3px rgba(20,28,65,.12); }
+  /* palette swatches */
+  .swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+  .swatch { position: relative; cursor: pointer; border: none; padding: 0; background: none; border-radius: 10px; aspect-ratio: 1; overflow: hidden; box-shadow: 0 0 0 1.5px var(--border-default); transition: box-shadow .15s, transform .15s; }
+  .swatch:hover { transform: translateY(-1px); }
+  .swatch.on { box-shadow: 0 0 0 2px var(--dhan-navy); }
+  .swatch .a, .swatch .b, .swatch .c { position: absolute; }
+  .swatch .a { inset: 0; }
+  .swatch .b { inset: auto 0 0 0; height: 38%; }
+  .swatch .c { right: 4px; top: 4px; width: 9px; height: 9px; border-radius: 999px; }
+  .swatch .tick { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font-size: 13px; text-shadow: 0 1px 3px rgba(0,0,0,.4); }
+  .tweaks-panel .body .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .tweaks-panel .body label { font-weight: 600; color: var(--fg-2); }
+  .tweaks-panel .body select,
+  .tweaks-panel .body input[type="text"] {
+    border: 1px solid var(--border-default); border-radius: 8px;
+    padding: 6px 8px; font-size: 12px; font-family: "Poppins";
+    flex: 1; min-width: 0;
+  }
+  /* toggle */
+  .tgl { position: relative; width: 36px; height: 20px; border-radius: 999px;
+         background: var(--border-strong); cursor: pointer; transition: background .2s; flex-shrink: 0; }
+  .tgl.on { background: var(--dhan-navy); }
+  .tgl::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 16px; height: 16px; border-radius: 50%; background: #fff;
+    transition: transform .2s var(--ease-spring);
+  }
+  .tgl.on::after { transform: translateX(16px); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script src="image-slot.js"></script>
+<script type="text/babel" src="components.jsx"></script>
+<script type="text/babel" src="screens-onboarding.jsx"></script>
+<script type="text/babel" src="screens-extra-auth.jsx"></script>
+<script type="text/babel" src="screens-main.jsx"></script>
+<script type="text/babel" src="screens-detail.jsx"></script>
+<script type="text/babel" src="screens-split.jsx"></script>
+<script type="text/babel" src="screens-extra-detail.jsx"></script>
+<script type="text/babel" src="screens-group.jsx"></script>
+<script type="text/babel" src="group-expense.jsx"></script>
+<script type="text/babel" src="screens-search.jsx"></script>
+<script type="text/babel" src="custom-framework.jsx"></script>
+<script type="text/babel" src="budget-edit.jsx"></script>
+<script type="text/babel" src="insights.jsx"></script>
+<script type="text/babel" src="settings-sub.jsx"></script>
+  <script type="text/babel" src="screens-settings.jsx"></script>
+  <script type="text/babel" src="screens-sheets.jsx"></script>
+  <script type="text/babel" src="currency-converter.jsx"></script>
+<script type="text/babel" src="app.jsx"></script>
+</body>
+</html>

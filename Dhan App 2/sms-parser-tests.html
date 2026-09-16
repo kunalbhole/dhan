@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dhan · SMS parser tests</title>
+<link rel="stylesheet" href="colors_and_type.css">
+<style>
+body{margin:0;background:#F6F7FB;color:#141C41;font-family:Poppins,system-ui,sans-serif;padding:24px}
+.wrap{max-width:860px;margin:0 auto}
+h1{font-size:20px;font-weight:500;margin:0 0 4px}
+.sub{font-size:13px;color:#6B7280;margin:0 0 20px}
+.summary{display:flex;gap:10px;align-items:center;background:#fff;border:1px solid #E7E9F0;border-radius:12px;padding:14px 16px;margin-bottom:16px;font-size:14px;font-weight:600}
+.dot{width:10px;height:10px;border-radius:999px}
+.case{background:#fff;border:1px solid #E7E9F0;border-radius:12px;padding:14px 16px;margin-bottom:10px}
+.case h2{font-size:14px;font-weight:600;margin:0 0 6px;display:flex;gap:8px;align-items:center}
+.tag{font-size:10px;font-weight:700;letter-spacing:.04em;padding:3px 8px;border-radius:999px}
+.pass{background:#E6F5EC;color:#137A45}.fail{background:#FDECEC;color:#C0392B}
+.sms{font-size:12px;color:#4B5563;background:#F6F7FB;border-radius:8px;padding:8px 10px;margin:0 0 8px;font-family:ui-monospace,monospace}
+ul{margin:0;padding-left:18px;font-size:12.5px;color:#4B5563;line-height:1.65}
+li.bad{color:#C0392B;font-weight:600}
+pre{font-size:11.5px;background:#0F1533;color:#D8DEF5;border-radius:8px;padding:10px;overflow:auto;margin:8px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>SMS parser · unit tests</h1>
+  <p class="sub">Foreign-currency detection, forex-fee splitting, and non-regression on domestic SMS.</p>
+  <div id="summary" class="summary"></div>
+  <div id="out"></div>
+</div>
+<script src="sms-parser.js"></script>
+<script>
+const tests = [
+  {
+    name: "Single-currency SMS is unaffected",
+    sms: "Rs. 420.00 debited from A/c XX4412 on 23-04 at Swiggy. Ref 884120.",
+    check(t) {
+      return [
+        ["one transaction", t.length === 1],
+        ["amount = -420", t[0].a === -420],
+        ["isForeignTransaction false", t[0].isForeignTransaction === false],
+        ["originalCurrency null", t[0].originalCurrency === null],
+        ["inrAmount = 420", t[0].inrAmount === 420],
+        ["merchant = Swiggy", t[0].m === "Swiggy"],
+        ["category = food", t[0].c === "food"],
+      ];
+    },
+  },
+  {
+    name: "Dual-currency SMS — foreign first",
+    sms: "Card XX7781: USD 45.00 spent, INR 3,842 debited on 22-04 at Figma Inc.",
+    check(t) {
+      return [
+        ["one transaction", t.length === 1],
+        ["isForeignTransaction true", t[0].isForeignTransaction === true],
+        ["originalCurrency = USD", t[0].originalCurrency === "USD"],
+        ["originalAmount = 45", t[0].originalAmount === 45],
+        ["inrAmount = 3842", t[0].inrAmount === 3842],
+        ["ledger amount uses INR leg", t[0].a === -3842],
+        ["no fee entry created", t.every(x => x.c !== "forex-fee")],
+      ];
+    },
+  },
+  {
+    name: "Dual-currency SMS — equals form",
+    sms: "Intl txn: EUR 20 = INR 1,850 debited from A/c XX4412 at Trainline.",
+    check(t) {
+      return [
+        ["one transaction", t.length === 1],
+        ["originalCurrency = EUR", t[0].originalCurrency === "EUR"],
+        ["originalAmount = 20", t[0].originalAmount === 20],
+        ["inrAmount = 1850", t[0].inrAmount === 1850],
+        ["isForeignTransaction true", t[0].isForeignTransaction === true],
+      ];
+    },
+  },
+  {
+    name: "Edge case — INR appears before the foreign amount",
+    sms: "INR 3,842 debited from A/c XX4412 towards USD 45.00 spent at Figma Inc on 22-04.",
+    check(t) {
+      return [
+        ["one transaction", t.length === 1],
+        ["inrAmount = 3842 (not swapped)", t[0].inrAmount === 3842],
+        ["originalAmount = 45", t[0].originalAmount === 45],
+        ["originalCurrency = USD", t[0].originalCurrency === "USD"],
+        ["ledger amount = -3842", t[0].a === -3842],
+      ];
+    },
+  },
+  {
+    name: "Forex-fee-only SMS becomes its own entry",
+    sms: "Forex markup fee INR 76 debited from A/c XX4412 for txn on 22-04.",
+    check(t) {
+      return [
+        ["exactly one entry", t.length === 1],
+        ["category = forex-fee", t[0].c === "forex-fee"],
+        ["category is locked", t[0].categoryLocked === true],
+        ["amount = -76", t[0].a === -76],
+        ["inrAmount = 76", t[0].inrAmount === 76],
+        ["not flagged foreign (INR only)", t[0].isForeignTransaction === false],
+      ];
+    },
+  },
+  {
+    name: "Fee is never merged into the spend it belongs to",
+    sms: null,
+    run: () => window.parseSmsBatch([
+      "Card XX7781: USD 45.00 spent, INR 3,842 debited on 22-04 at Figma Inc.",
+      "Forex markup fee INR 76 debited from A/c XX4412 for txn on 22-04.",
+    ]),
+    check(t) {
+      const spend = t.find(x => x.c !== "forex-fee");
+      const fee = t.find(x => x.c === "forex-fee");
+      return [
+        ["two independent entries", t.length === 2],
+        ["spend still 3842", spend && spend.a === -3842],
+        ["fee still 76", fee && fee.a === -76],
+        ["no link field on either (V1)", !("linkedTxnId" in (spend||{})) && !("linkedTxnId" in (fee||{}))],
+        ["distinct ids", spend && fee && spend.id !== fee.id],
+      ];
+    },
+  },
+  {
+    name: "Credit SMS stays positive and non-foreign",
+    sms: "INR 82,500 credited to A/c XX4412 as Salary from Acme Co on 23-04.",
+    check(t) {
+      return [
+        ["amount positive", t[0].a === 82500],
+        ["category = income", t[0].c === "income"],
+        ["isForeignTransaction false", t[0].isForeignTransaction === false],
+      ];
+    },
+  },
+  {
+    name: "Uppercase noise is not read as a currency",
+    sms: "Rs 240 debited via UPI 448120 VPA bluetokai@hdfc OTP 993412 at Blue Tokai.",
+    check(t) {
+      return [
+        ["isForeignTransaction false", t[0].isForeignTransaction === false],
+        ["originalCurrency null", t[0].originalCurrency === null],
+        ["amount = -240", t[0].a === -240],
+      ];
+    },
+  },
+  {
+    name: "Non-transactional SMS yields nothing",
+    sms: "Your Dhan OTP is 448120. Do not share it with anyone.",
+    check(t) { return [["no transactions", t.length === 0]]; },
+  },
+];
+
+let pass = 0, fail = 0;
+const out = document.getElementById("out");
+for (const t of tests) {
+  const result = t.run ? t.run() : window.parseSms(t.sms);
+  let rows;
+  try { rows = t.check(result); } catch (e) { rows = [["threw: " + e.message, false]]; }
+  const ok = rows.every(r => r[1]);
+  ok ? pass++ : fail++;
+  const el = document.createElement("div");
+  el.className = "case";
+  el.innerHTML =
+    '<h2><span class="tag ' + (ok ? "pass" : "fail") + '">' + (ok ? "PASS" : "FAIL") + "</span>" + t.name + "</h2>" +
+    (t.sms ? '<p class="sms">' + t.sms.replace(/</g, "&lt;") + "</p>" : "") +
+    "<ul>" + rows.map(r => '<li class="' + (r[1] ? "" : "bad") + '">' + (r[1] ? "✓ " : "✗ ") + r[0] + "</li>").join("") + "</ul>" +
+    (ok ? "" : "<pre>" + JSON.stringify(result, null, 2).replace(/</g, "&lt;") + "</pre>");
+  out.appendChild(el);
+}
+const s = document.getElementById("summary");
+s.innerHTML = '<span class="dot" style="background:' + (fail ? "#C0392B" : "#137A45") + '"></span>' +
+  pass + " passing" + (fail ? " · " + fail + " failing" : "") + " · " + tests.length + " cases";
+</script>
+</body>
+</html>
