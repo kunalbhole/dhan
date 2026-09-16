@@ -1,0 +1,9 @@
+{
+  "name": "DhanApp",
+  "displayName": "DhanApp",
+  "extra": {
+    "eas": {
+      "projectId": "0cfc2e1a-b6b0-4646-aa69-bd9f33f04230"
+    }
+  }
+}
