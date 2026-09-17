@@ -1,4 +1,4 @@
-import { useState, type ComponentType } from 'react';
+import { useEffect, useState, type ComponentType } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -10,6 +10,7 @@ import { PlusCircleIcon } from 'phosphor-react-native/lib/module/icons/PlusCircl
 import { ChartLineUpIcon } from 'phosphor-react-native/lib/module/icons/ChartLineUp';
 import { TargetIcon } from 'phosphor-react-native/lib/module/icons/Target';
 import { CaretRightIcon } from 'phosphor-react-native/lib/module/icons/CaretRight';
+import { ReceiptIcon } from 'phosphor-react-native/lib/module/icons/Receipt';
 import AppHeader from '../components/AppHeader';
 import AppText from '../components/AppText';
 import Card from '../components/Card';
@@ -21,16 +22,19 @@ import UncatCard from '../components/UncatCard';
 import InsightsTeaser from '../components/InsightsTeaser';
 import { colors, radii, shadows, spacing } from '../theme';
 import { frameworkBuckets } from '../lib/frameworks';
-import { SAMPLE_TXNS, UPCOMING_BILLS } from '../lib/sampleData';
+import { UPCOMING_BILLS } from '../lib/sampleData';
 import { BILL_ICONS } from '../lib/billIcons';
-import { formatIndianNumber } from '../lib/format';
+import { formatIndianNumber, formatTime } from '../lib/format';
+import { getRecentTransactions, getUncategorisedTransactions, subscribeToTransactionsChanged, type StoredTransaction } from '../lib/db';
 import type { PhosphorIconProps } from '../components/IconChip';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
-// Reference-hardcoded sample figures (screens-main.jsx's HomeScreen) — not
-// derived from real transactions/budget state, same status as SAMPLE_TXNS.
+// Reference-hardcoded sample figures (screens-main.jsx's HomeScreen).
+// Recent transactions and Uncategorised below are now backed by the real
+// SQLite table (src/lib/db.ts); these balance/budget totals still aren't —
+// that needs a real ledger/budget-cap model this app doesn't have yet.
 const USER_NAME = 'Priya';
 const GREETING = 'Morning';
 const BALANCE = 124500;
@@ -56,21 +60,57 @@ const QUICK_ACTIONS: QuickAction[] = [
 ];
 
 // None of the destinations below (More, Search, Notifications, Insights,
-// Budget, Transactions, Goals, Bills, Txn detail, Add-txn sheet) exist as
-// screens yet — every interactive element here is wired to this stub so
-// the UI is visually and interactively complete without crashing on a
-// route that doesn't exist. Replace with real navigation.navigate calls
-// as each destination screen gets built.
+// Budget, Transactions, Goals, Bills, Add-txn sheet) exist as screens yet
+// — every interactive element here is wired to this stub so the UI is
+// visually and interactively complete without crashing on a route that
+// doesn't exist. Replace with real navigation.navigate calls as each
+// destination screen gets built. (Txn detail is real now — see the
+// TxnRow onPress below.)
 const stubNav = (dest: string) => {
   // eslint-disable-next-line no-console
   console.log('[HomeScreen] nav ->', dest);
 };
 
-function HomeScreen(_props: Props) {
+// Composes a TxnRow subtitle from real stored fields: the parser's own
+// descriptive line plus the time, mirroring the reference sample data's
+// "<description> · <time>" shape without fabricating anything we don't
+// actually know about the transaction.
+function txnMeta(row: StoredTransaction): string {
+  return `${row.subtitle} · ${formatTime(row.timestamp)}`;
+}
+
+function HomeScreen({ navigation }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('home');
-  const recent = SAMPLE_TXNS.slice(0, 4);
+  const [recentTxns, setRecentTxns] = useState<StoredTransaction[]>([]);
+  const [uncatTxns, setUncatTxns] = useState<StoredTransaction[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const buckets = frameworkBuckets('50-30-20');
   const upcomingBills = UPCOMING_BILLS.filter(b => b.status !== 'paid').slice(0, 4);
+
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      Promise.all([getRecentTransactions(4), getUncategorisedTransactions(12)])
+        .then(([recent, uncat]) => {
+          if (!alive) return;
+          setRecentTxns(recent);
+          setUncatTxns(uncat);
+          setLoaded(true);
+        })
+        .catch(() => {
+          if (alive) setLoaded(true);
+        });
+    };
+    load();
+    // Fires after every successful insert — SMS parsing runs at the app
+    // root (App.tsx), decoupled from whichever screen is on top, so this
+    // is how Home picks up a transaction that arrives while it's mounted.
+    const unsubscribe = subscribeToTransactionsChanged(load);
+    return () => {
+      alive = false;
+      unsubscribe();
+    };
+  }, []);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bgSurface }} edges={['top', 'bottom']}>
@@ -180,8 +220,12 @@ function HomeScreen(_props: Props) {
           })}
         </View>
 
-        {/* Uncategorised */}
-        <UncatCard onCategorise={() => stubNav('uncat')} />
+        {/* Uncategorised — UncatCard itself renders nothing when the list
+            is empty, which is the correct empty state for this nudge card. */}
+        <UncatCard
+          list={uncatTxns.map(t => ({ id: String(t.id), m: t.merchant ?? 'Unknown', s: txnMeta(t), a: t.amount }))}
+          onCategorise={() => stubNav('uncat')}
+        />
 
         {/* This month's budget */}
         <SectionHeader title="This month's budget" onSeeAll={() => stubNav('budget')} />
@@ -226,23 +270,51 @@ function HomeScreen(_props: Props) {
           })}
         </Card>
 
-        {/* Recent transactions */}
+        {/* Recent transactions — a fresh install genuinely has none until
+            real SMS come in, so this is an explicit empty state rather
+            than an empty/missing card (unlike UncatCard, "Recent
+            transactions" is a permanent section per CLAUDE.md's fixed
+            order, not a conditional nudge). Nothing renders until the
+            first load resolves, to avoid a flash of the empty state. */}
         <SectionHeader title="Recent transactions" onSeeAll={() => stubNav('txn')} />
         <Card style={{ paddingVertical: 4, paddingHorizontal: spacing.s4, marginBottom: spacing.s4 }}>
-          {recent.map((t, i) => (
-            <TxnRow
-              key={t.id}
-              merchant={t.m}
-              meta={t.s}
-              amount={t.a}
-              cat={t.c}
-              isForeign={t.isForeignTransaction}
-              currency={t.originalCurrency}
-              originalAmount={t.originalAmount}
-              onPress={() => stubNav('txn-detail')}
-              last={i === recent.length - 1}
-            />
-          ))}
+          {!loaded ? null : recentTxns.length === 0 ? (
+            <View style={{ alignItems: 'center', paddingVertical: spacing.s5, gap: spacing.s2 }}>
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: radii.control,
+                  backgroundColor: colors.bgSurface,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <ReceiptIcon size={22} color={colors.fg3} />
+              </View>
+              <AppText weight="medium" style={{ fontSize: 14 }}>
+                No transactions yet
+              </AppText>
+              <AppText style={{ fontSize: 12, color: colors.fg3, textAlign: 'center' }}>
+                They&apos;ll show up here automatically once we detect a bank SMS.
+              </AppText>
+            </View>
+          ) : (
+            recentTxns.map((t, i) => (
+              <TxnRow
+                key={t.id}
+                merchant={t.merchant ?? 'Unknown'}
+                meta={txnMeta(t)}
+                amount={t.amount}
+                cat={t.category}
+                isForeign={t.isForeignTransaction}
+                currency={t.originalCurrency ?? undefined}
+                originalAmount={t.originalAmount ?? undefined}
+                onPress={() => navigation.navigate('TxnDetail', { transaction: t })}
+                last={i === recentTxns.length - 1}
+              />
+            ))
+          )}
         </Card>
 
         {/* Insights teaser */}

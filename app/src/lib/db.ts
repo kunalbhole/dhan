@@ -7,6 +7,11 @@ export interface StoredTransaction {
   dedupKey: string;
   sender: string | null;
   merchant: string | null;
+  // The parser's own descriptive line (e.g. "Auto-detected from SMS",
+  // "USD 45 · international") — persisted as-is rather than reconstructed
+  // later, since it already captures things (foreign-currency detail, the
+  // forex-fee note) that aren't derivable from the other stored columns.
+  subtitle: string;
   body: string;
   amount: number;
   category: string;
@@ -31,6 +36,7 @@ function getDb(): Promise<DB> {
           dedup_key TEXT NOT NULL,
           sender TEXT,
           merchant TEXT,
+          subtitle TEXT NOT NULL,
           body TEXT NOT NULL,
           amount REAL NOT NULL,
           category TEXT NOT NULL,
@@ -70,14 +76,15 @@ export async function insertTransaction(
 
   const result = await database.execute(
     `INSERT OR IGNORE INTO transactions
-       (dedup_key, sender, merchant, body, amount, category,
+       (dedup_key, sender, merchant, subtitle, body, amount, category,
         is_foreign_transaction, original_currency, original_amount, inr_amount,
         category_locked, timestamp, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
     [
       dedupKey,
       sender,
       txn.m,
+      txn.s,
       txn.raw ?? '',
       txn.a,
       txn.c,
@@ -95,25 +102,25 @@ export async function insertTransaction(
     return { status: 'duplicate', dedupKey };
   }
 
-  return {
-    status: 'inserted',
-    transaction: {
-      id: result.insertId as number,
-      dedupKey,
-      sender,
-      merchant: txn.m,
-      body: txn.raw ?? '',
-      amount: txn.a,
-      category: txn.c,
-      isForeignTransaction: txn.isForeignTransaction,
-      originalCurrency: txn.originalCurrency,
-      originalAmount: txn.originalAmount,
-      inrAmount: txn.inrAmount,
-      categoryLocked: !!txn.categoryLocked,
-      timestamp,
-      createdAt,
-    },
+  const transaction: StoredTransaction = {
+    id: result.insertId as number,
+    dedupKey,
+    sender,
+    merchant: txn.m,
+    subtitle: txn.s,
+    body: txn.raw ?? '',
+    amount: txn.a,
+    category: txn.c,
+    isForeignTransaction: txn.isForeignTransaction,
+    originalCurrency: txn.originalCurrency,
+    originalAmount: txn.originalAmount,
+    inrAmount: txn.inrAmount,
+    categoryLocked: !!txn.categoryLocked,
+    timestamp,
+    createdAt,
   };
+  notifyTransactionsChanged();
+  return { status: 'inserted', transaction };
 }
 
 export async function getTransactionCount(): Promise<number> {
@@ -122,17 +129,13 @@ export async function getTransactionCount(): Promise<number> {
   return result.rows[0].count as number;
 }
 
-export async function getRecentTransactions(limit = 20): Promise<StoredTransaction[]> {
-  const database = await getDb();
-  const result = await database.execute(
-    'SELECT * FROM transactions ORDER BY timestamp DESC LIMIT ?;',
-    [limit],
-  );
-  return result.rows.map((row) => ({
+function rowToTransaction(row: Record<string, unknown>): StoredTransaction {
+  return {
     id: row.id as number,
     dedupKey: row.dedup_key as string,
     sender: row.sender as string | null,
     merchant: row.merchant as string | null,
+    subtitle: row.subtitle as string,
     body: row.body as string,
     amount: row.amount as number,
     category: row.category as string,
@@ -143,5 +146,47 @@ export async function getRecentTransactions(limit = 20): Promise<StoredTransacti
     categoryLocked: !!row.category_locked,
     timestamp: row.timestamp as number,
     createdAt: row.created_at as number,
-  }));
+  };
+}
+
+export async function getRecentTransactions(limit = 20): Promise<StoredTransaction[]> {
+  const database = await getDb();
+  const result = await database.execute(
+    'SELECT * FROM transactions ORDER BY timestamp DESC LIMIT ?;',
+    [limit],
+  );
+  return result.rows.map(rowToTransaction);
+}
+
+// Real transactions the parser couldn't confidently categorise — guessCategory()
+// falls back to 'other' for these (see smsParser.ts). Locked categories
+// (e.g. forex-fee) are deliberate, not "uncategorised", so they're excluded.
+export async function getUncategorisedTransactions(limit = 20): Promise<StoredTransaction[]> {
+  const database = await getDb();
+  const result = await database.execute(
+    "SELECT * FROM transactions WHERE category = 'other' AND category_locked = 0 ORDER BY timestamp DESC LIMIT ?;",
+    [limit],
+  );
+  return result.rows.map(rowToTransaction);
+}
+
+export async function deleteTransaction(id: number): Promise<void> {
+  const database = await getDb();
+  await database.execute('DELETE FROM transactions WHERE id = ?;', [id]);
+  notifyTransactionsChanged();
+}
+
+// Lets any mounted screen react to a new transaction being stored (SMS
+// parsing happens at the app root in App.tsx, decoupled from whichever
+// screen is on top) without polling or a focus-based refetch.
+type TransactionsChangeListener = () => void;
+const changeListeners = new Set<TransactionsChangeListener>();
+
+export function subscribeToTransactionsChanged(listener: TransactionsChangeListener): () => void {
+  changeListeners.add(listener);
+  return () => changeListeners.delete(listener);
+}
+
+function notifyTransactionsChanged() {
+  changeListeners.forEach(listener => listener());
 }

@@ -279,3 +279,63 @@ declare module 'phosphor-react-native/lib/module/icons/Barbell' {
   export const Barbell: Icon;
   export const BarbellIcon: Icon;
 }
+
+declare module 'phosphor-react-native/lib/module/icons/CalendarBlank' {
+  import type { Icon } from 'phosphor-react-native';
+  export const CalendarBlank: Icon;
+  export const CalendarBlankIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Wallet' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Wallet: Icon;
+  export const WalletIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Hash' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Hash: Icon;
+  export const HashIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/CheckCircle' {
+  import type { Icon } from 'phosphor-react-native';
+  export const CheckCircle: Icon;
+  export const CheckCircleIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/NotePencil' {
+  import type { Icon } from 'phosphor-react-native';
+  export const NotePencil: Icon;
+  export const NotePencilIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/ShareNetwork' {
+  import type { Icon } from 'phosphor-react-native';
+  export const ShareNetwork: Icon;
+  export const ShareNetworkIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Trash' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Trash: Icon;
+  export const TrashIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/X' {
+  import type { Icon } from 'phosphor-react-native';
+  export const X: Icon;
+  export const XIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/ArrowsLeftRight' {
+  import type { Icon } from 'phosphor-react-native';
+  export const ArrowsLeftRight: Icon;
+  export const ArrowsLeftRightIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Info' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Info: Icon;
+  export const InfoIcon: Icon;
+}
