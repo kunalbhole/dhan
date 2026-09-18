@@ -1,15 +1,28 @@
-// AsyncStorage-persisted Dhan Plus membership flag — promoted out of
-// SettingsScreen's own local useState (which reset on every relaunch)
-// since CurrencyScreen also needs to read it for its Plus-gated rows.
-// There's no real payment/subscription backend behind this yet — same
-// honest-preference status as appLockStore.ts — but the reference's own
-// "Upgrade to Dhan Plus" tap toggles this for a demo, and now every
-// screen that gates on it sees the same real, persisted value.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const STORAGE_KEY = 'dhan-is-plus';
+const STORAGE_KEY = 'dhan-plan-details-v2';
 
-let isPlus = false;
+export interface PlanDetails {
+  isPlus: boolean;
+  trialActivatedAt: number | null;
+  trialExpiresAt: number | null;
+  mandateActive: boolean;
+  mandateBank: string | null;
+  planType: 'monthly' | 'annual';
+  monthlyAmount: number;
+}
+
+const DEFAULT_PLAN: PlanDetails = {
+  isPlus: true, // Default active for testing as requested
+  trialActivatedAt: Date.now(),
+  trialExpiresAt: Date.now() + 90 * 24 * 60 * 60 * 1000, // 3 months
+  mandateActive: true,
+  mandateBank: 'HDFC Bank (UPI Auto-Mandate)',
+  planType: 'monthly',
+  monthlyAmount: 199,
+};
+
+let currentPlan: PlanDetails = { ...DEFAULT_PLAN };
 let hydrated = false;
 let hydrating: Promise<void> | null = null;
 
@@ -21,14 +34,20 @@ function notify() {
 }
 
 async function persist(): Promise<void> {
-  await AsyncStorage.setItem(STORAGE_KEY, isPlus ? '1' : '0');
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(currentPlan));
 }
 
 async function hydrate(): Promise<void> {
   if (hydrated) return;
   if (!hydrating) {
     hydrating = AsyncStorage.getItem(STORAGE_KEY).then(raw => {
-      isPlus = raw === '1';
+      if (raw) {
+        try {
+          currentPlan = { ...DEFAULT_PLAN, ...JSON.parse(raw) };
+        } catch {
+          currentPlan = { ...DEFAULT_PLAN };
+        }
+      }
       hydrated = true;
       notify();
     });
@@ -37,8 +56,12 @@ async function hydrate(): Promise<void> {
 }
 hydrate();
 
+export function getPlanDetails(): PlanDetails {
+  return currentPlan;
+}
+
 export function getIsPlus(): boolean {
-  return isPlus;
+  return currentPlan.isPlus;
 }
 
 export function subscribeToPlan(listener: Listener): () => void {
@@ -47,7 +70,37 @@ export function subscribeToPlan(listener: Listener): () => void {
 }
 
 export function setIsPlus(value: boolean): void {
-  isPlus = value;
+  currentPlan = { ...currentPlan, isPlus: value };
+  notify();
+  persist();
+}
+
+export function activateTrial(
+  bankName: string,
+  planType: 'monthly' | 'annual' = 'monthly',
+): PlanDetails {
+  const now = Date.now();
+  const threeMonths = 90 * 24 * 60 * 60 * 1000;
+  currentPlan = {
+    isPlus: true,
+    trialActivatedAt: now,
+    trialExpiresAt: now + threeMonths,
+    mandateActive: true,
+    mandateBank: bankName,
+    planType,
+    monthlyAmount: planType === 'monthly' ? 199 : 150,
+  };
+  notify();
+  persist();
+  return currentPlan;
+}
+
+export function cancelSubscription(): void {
+  currentPlan = {
+    ...currentPlan,
+    isPlus: false,
+    mandateActive: false,
+  };
   notify();
   persist();
 }

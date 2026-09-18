@@ -19,6 +19,7 @@ import { CATEGORY_ICONS } from '../lib/categoryIcons';
 import { computeInsightFeed, computeSummary, type InsightCard, type InsightPeriodId, type InsightTone } from '../lib/insights';
 import { getRecentTransactions, subscribeToTransactionsChanged, type StoredTransaction } from '../lib/db';
 import { getBills, subscribeToBills } from '../lib/billsStore';
+import { getIsPlus, subscribeToPlan } from '../lib/planStore';
 import type { Bill } from '../lib/bills';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -39,6 +40,7 @@ function InsightsScreen({ navigation }: Props) {
   const [period, setPeriod] = useState<InsightPeriodId>('week');
   const [txns, setTxns] = useState<StoredTransaction[]>([]);
   const [bills, setBills] = useState<Bill[]>(getBills());
+  const [isPlus, setIsPlusState] = useState(getIsPlus());
   const [selectedInsight, setSelectedInsight] = useState<InsightCard | null>(null);
 
   useEffect(() => {
@@ -51,6 +53,10 @@ function InsightsScreen({ navigation }: Props) {
 
   useEffect(() => {
     return subscribeToBills(() => setBills([...getBills()]));
+  }, []);
+
+  useEffect(() => {
+    return subscribeToPlan(() => setIsPlusState(getIsPlus()));
   }, []);
 
   const summary = useMemo(() => computeSummary(txns, period), [txns, period]);
@@ -171,43 +177,105 @@ function InsightsScreen({ navigation }: Props) {
           })
         )}
 
-        <Pressable onPress={() => navigation.navigate('PlusPaywall', { note: 'Unlock AI-powered behavioral analytics with Dhan Plus' })}>
-          <Card style={{ padding: spacing.s3 + 2, marginTop: spacing.s2, flexDirection: 'row', alignItems: 'center', gap: spacing.s4, opacity: 0.9 }}>
-            <View>
-              <View style={{ opacity: 0.5 }}>
-                <IconChip icon={SparkleIcon} color={colors.gold} bg={colors.goldBg} fill />
+        {/* AI-Powered Insights Section: Unlocked when Plus is Active */}
+        {isPlus ? (
+          <View style={{ marginTop: spacing.s2, gap: spacing.s2 }}>
+            <Card style={{ padding: spacing.s3 + 2, flexDirection: 'row', alignItems: 'center', gap: spacing.s4 }}>
+              <IconChip icon={SparkleIcon} color={colors.gold} bg={colors.goldBg} fill />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <AppText weight="semibold" style={{ fontSize: 14, color: colors.navy }}>
+                    AI Anomaly Detection
+                  </AppText>
+                  <View style={{ backgroundColor: colors.goldBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                    <AppText weight="bold" style={{ fontSize: 9, color: colors.navy }}>
+                      PLUS
+                    </AppText>
+                  </View>
+                </View>
+                <AppText style={{ fontSize: 12.5, color: colors.fg3, marginTop: 2, lineHeight: 17 }}>
+                  Unusual ₹2,450 spend detected on electronics — 80% higher than your weekend average.
+                </AppText>
               </View>
-              <View
-                style={{
-                  position: 'absolute',
-                  top: -6,
-                  right: -6,
-                  width: 18,
-                  height: 18,
-                  borderRadius: radii.pill,
-                  backgroundColor: colors.navy,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <LockSimpleIcon size={9} color={colors.fgOnDark} weight="fill" />
+            </Card>
+
+            <Card style={{ padding: spacing.s3 + 2, flexDirection: 'row', alignItems: 'center', gap: spacing.s4 }}>
+              <IconChip icon={PiggyBankIcon} color={colors.income} bg={colors.incomeBg} fill />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <AppText weight="semibold" style={{ fontSize: 14, color: colors.navy }}>
+                    Smart Savings Recommendation
+                  </AppText>
+                  <View style={{ backgroundColor: colors.incomeBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                    <AppText weight="bold" style={{ fontSize: 9, color: colors.income }}>
+                      PLUS
+                    </AppText>
+                  </View>
+                </View>
+                <AppText style={{ fontSize: 12.5, color: colors.fg3, marginTop: 2, lineHeight: 17 }}>
+                  Save ~₹1,200/mo by switching recurring food delivery orders to weekly meal prep.
+                </AppText>
               </View>
-            </View>
-            <View style={{ flex: 1, minWidth: 0, opacity: 0.5 }}>
-              <AppText weight="semibold" style={{ fontSize: 14, color: colors.navy }}>
-                AI-powered insights
-              </AppText>
-              <AppText style={{ fontSize: 12.5, color: colors.fg3, marginTop: 2, lineHeight: 17 }}>
-                Deeper trend breakdowns and personalized tips — included with Dhan Plus
-              </AppText>
-            </View>
-            <View style={{ backgroundColor: colors.gold, paddingVertical: 7, paddingHorizontal: 14, borderRadius: radii.pill }}>
-              <AppText weight="bold" style={{ fontSize: 11.5, color: colors.fgOnGold }}>
-                Upgrade
-              </AppText>
-            </View>
-          </Card>
-        </Pressable>
+            </Card>
+
+            <Card style={{ padding: spacing.s3 + 2, flexDirection: 'row', alignItems: 'center', gap: spacing.s4 }}>
+              <IconChip icon={TrendUpIcon} color={colors.navy} bg={`${colors.navy}14`} fill />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <AppText weight="semibold" style={{ fontSize: 14, color: colors.navy }}>
+                    Financial Health Score: 88/100
+                  </AppText>
+                  <View style={{ backgroundColor: `${colors.navy}14`, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                    <AppText weight="bold" style={{ fontSize: 9, color: colors.navy }}>
+                      EXCELLENT
+                    </AppText>
+                  </View>
+                </View>
+                <AppText style={{ fontSize: 12.5, color: colors.fg3, marginTop: 2, lineHeight: 17 }}>
+                  Healthy 20% savings allocation and low debt ratio across all linked accounts.
+                </AppText>
+              </View>
+            </Card>
+          </View>
+        ) : (
+          <Pressable onPress={() => navigation.navigate('PlusPaywall', { note: 'Unlock AI-powered behavioral analytics with Dhan Plus' })}>
+            <Card style={{ padding: spacing.s3 + 2, marginTop: spacing.s2, flexDirection: 'row', alignItems: 'center', gap: spacing.s4, opacity: 0.9 }}>
+              <View>
+                <View style={{ opacity: 0.5 }}>
+                  <IconChip icon={SparkleIcon} color={colors.gold} bg={colors.goldBg} fill />
+                </View>
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: -6,
+                    right: -6,
+                    width: 18,
+                    height: 18,
+                    borderRadius: radii.pill,
+                    backgroundColor: colors.navy,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <LockSimpleIcon size={9} color={colors.fgOnDark} weight="fill" />
+                </View>
+              </View>
+              <View style={{ flex: 1, minWidth: 0, opacity: 0.5 }}>
+                <AppText weight="semibold" style={{ fontSize: 14, color: colors.navy }}>
+                  AI-powered insights
+                </AppText>
+                <AppText style={{ fontSize: 12.5, color: colors.fg3, marginTop: 2, lineHeight: 17 }}>
+                  Deeper trend breakdowns and personalized tips — included with Dhan Plus
+                </AppText>
+              </View>
+              <View style={{ backgroundColor: colors.gold, paddingVertical: 7, paddingHorizontal: 14, borderRadius: radii.pill }}>
+                <AppText weight="bold" style={{ fontSize: 11.5, color: colors.fgOnGold }}>
+                  Upgrade
+                </AppText>
+              </View>
+            </Card>
+          </Pressable>
+        )}
       </ScrollView>
 
       {/* Insight Breakdown Sheet */}
