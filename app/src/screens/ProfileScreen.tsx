@@ -3,14 +3,15 @@ import { Image, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { getAuth } from '@react-native-firebase/auth';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import { CameraIcon } from 'phosphor-react-native/lib/module/icons/Camera';
 import { CaretRightIcon } from 'phosphor-react-native/lib/module/icons/CaretRight';
 import { CheckCircleIcon } from 'phosphor-react-native/lib/module/icons/CheckCircle';
 import { GoogleLogoIcon } from 'phosphor-react-native/lib/module/icons/GoogleLogo';
+import { ImageIcon } from 'phosphor-react-native/lib/module/icons/Image';
 import { KeyIcon } from 'phosphor-react-native/lib/module/icons/Key';
 import { ShieldCheckIcon } from 'phosphor-react-native/lib/module/icons/ShieldCheck';
 import { TrashIcon } from 'phosphor-react-native/lib/module/icons/Trash';
-import { UserCircleIcon } from 'phosphor-react-native/lib/module/icons/UserCircle';
 import AppText from '../components/AppText';
 import BottomSheet from '../components/BottomSheet';
 import Button from '../components/Button';
@@ -25,15 +26,6 @@ import { showToast } from '../lib/toast';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
-
-const PRESET_AVATARS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&auto=format&fit=crop&q=80',
-];
 
 const DEFAULT_GOOGLE_AVATAR = 'https://lh3.googleusercontent.com/a/default-user=s120-p';
 
@@ -50,8 +42,6 @@ function ProfileScreen({ navigation }: Props) {
   const [city, setCity] = useState(profile.city);
 
   const [photoSheet, setPhotoSheet] = useState(false);
-  const [customUrl, setCustomUrl] = useState('');
-  const [showUrlInput, setShowUrlInput] = useState(false);
   const [preview, setPreview] = useState<{ src: string; source: string } | null>(null);
 
   const [phoneNumber, setPhoneNumber] = useState<string | undefined>(undefined);
@@ -69,18 +59,16 @@ function ProfileScreen({ navigation }: Props) {
     }
   }, []);
 
-  useEffect(
-    () =>
-      subscribeToProfile(() => {
-        const p = getProfile();
-        setProfile(p);
-        setName(p.name);
-        setEmail(p.email);
-        setDob(p.dob);
-        setCity(p.city);
-      }),
-    [],
-  );
+  useEffect(() => {
+    return subscribeToProfile(() => {
+      const p = getProfile();
+      setProfile(p);
+      setName(p.name);
+      setEmail(p.email);
+      setDob(p.dob);
+      setCity(p.city);
+    });
+  }, []);
 
   const commit = (field: 'name' | 'email' | 'dob' | 'city', value: string) => {
     if (profile[field] === value) return;
@@ -90,21 +78,47 @@ function ProfileScreen({ navigation }: Props) {
 
   const initial = name.trim()[0]?.toUpperCase() ?? '?';
 
-  const handleSelectPreset = (url: string) => {
+  const handlePickFromLibrary = () => {
     setPhotoSheet(false);
-    setPreview({ src: url, source: 'Avatar collection' });
+    launchImageLibrary(
+      {
+        mediaType: 'photo',
+        quality: 0.8,
+        maxWidth: 600,
+        maxHeight: 600,
+      },
+      res => {
+        if (res.didCancel || res.errorCode) return;
+        const uri = res.assets?.[0]?.uri;
+        if (uri) {
+          setPreview({ src: uri, source: 'Photo Library' });
+        }
+      },
+    );
+  };
+
+  const handleTakePhoto = () => {
+    setPhotoSheet(false);
+    launchCamera(
+      {
+        mediaType: 'photo',
+        quality: 0.8,
+        maxWidth: 600,
+        maxHeight: 600,
+      },
+      res => {
+        if (res.didCancel || res.errorCode) return;
+        const uri = res.assets?.[0]?.uri;
+        if (uri) {
+          setPreview({ src: uri, source: 'Camera' });
+        }
+      },
+    );
   };
 
   const handleUseGooglePhoto = () => {
     setPhotoSheet(false);
     setPreview({ src: googlePhotoUrl, source: 'Google account' });
-  };
-
-  const handleApplyCustomUrl = () => {
-    if (!customUrl.trim()) return;
-    setPhotoSheet(false);
-    setShowUrlInput(false);
-    setPreview({ src: customUrl.trim(), source: 'Image Link' });
   };
 
   const handleRemovePhoto = () => {
@@ -192,80 +206,85 @@ function ProfileScreen({ navigation }: Props) {
 
       {/* Photo Option Sheet */}
       <BottomSheet open={photoSheet} onClose={() => setPhotoSheet(false)} title="Profile photo">
-        <View style={{ gap: spacing.s3 }}>
-          {/* Option: Google Account Photo */}
+        <View style={{ gap: spacing.s2 }}>
+          {/* Option 1: Upload from library */}
+          <Pressable
+            onPress={handlePickFromLibrary}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.s4,
+              paddingVertical: 14,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.borderSubtle,
+            }}
+          >
+            <IconChip icon={ImageIcon} color={colors.navy} bg={colors.bgSurface} />
+            <View style={{ flex: 1 }}>
+              <AppText weight="semibold" style={{ fontSize: 14, color: colors.fg1 }}>
+                Choose from photo library
+              </AppText>
+              <AppText style={{ fontSize: 12, color: colors.fg3, marginTop: 2 }}>
+                Upload a picture from your device
+              </AppText>
+            </View>
+            <CaretRightIcon size={14} color={colors.fg4} />
+          </Pressable>
+
+          {/* Option 2: Take photo with camera */}
+          <Pressable
+            onPress={handleTakePhoto}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.s4,
+              paddingVertical: 14,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.borderSubtle,
+            }}
+          >
+            <IconChip icon={CameraIcon} color={colors.navy} bg={colors.bgSurface} />
+            <View style={{ flex: 1 }}>
+              <AppText weight="semibold" style={{ fontSize: 14, color: colors.fg1 }}>
+                Take a photo
+              </AppText>
+              <AppText style={{ fontSize: 12, color: colors.fg3, marginTop: 2 }}>
+                Use your device camera
+              </AppText>
+            </View>
+            <CaretRightIcon size={14} color={colors.fg4} />
+          </Pressable>
+
+          {/* Option 3: Google Account Photo */}
           <Pressable
             onPress={handleUseGooglePhoto}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
               gap: spacing.s4,
-              paddingVertical: spacing.s3,
-              borderBottomWidth: 1,
+              paddingVertical: 14,
+              borderBottomWidth: profile.avatarUri ? 1 : 0,
               borderBottomColor: colors.borderSubtle,
             }}
           >
             <IconChip icon={GoogleLogoIcon} color={colors.navy} bg={colors.bgSurface} />
             <View style={{ flex: 1 }}>
-              <AppText style={{ fontSize: 14, color: colors.fg1 }}>Use Google account photo</AppText>
-              <AppText style={{ fontSize: 12, color: colors.fg3, marginTop: 2 }}>{email || 'Sync from account'}</AppText>
+              <AppText weight="semibold" style={{ fontSize: 14, color: colors.fg1 }}>
+                Use Google account photo
+              </AppText>
+              <AppText style={{ fontSize: 12, color: colors.fg3, marginTop: 2 }}>
+                {email || 'Sync from account'}
+              </AppText>
             </View>
             <CaretRightIcon size={14} color={colors.fg4} />
           </Pressable>
 
-          {/* Option: Preset Avatars Grid */}
-          <View style={{ paddingVertical: spacing.s2 }}>
-            <AppText weight="semibold" style={{ fontSize: 13, color: colors.fg1, marginBottom: spacing.s2 }}>
-              Choose from avatar collection
-            </AppText>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.s3, paddingVertical: 4 }}>
-              {PRESET_AVATARS.map((url, idx) => (
-                <Pressable key={idx} onPress={() => handleSelectPreset(url)}>
-                  <Image source={{ uri: url }} style={{ width: 56, height: 56, borderRadius: radii.pill, borderWidth: 2, borderColor: colors.borderDefault }} />
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-
-          {/* Option: Image Link */}
-          <Pressable
-            onPress={() => setShowUrlInput(!showUrlInput)}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: spacing.s4,
-              paddingVertical: spacing.s3,
-              borderTopWidth: 1,
-              borderTopColor: colors.borderSubtle,
-            }}
-          >
-            <IconChip icon={UserCircleIcon} color={colors.navy} bg={colors.bgSurface} />
-            <View style={{ flex: 1 }}>
-              <AppText style={{ fontSize: 14, color: colors.fg1 }}>Paste photo URL</AppText>
-              <AppText style={{ fontSize: 12, color: colors.fg3, marginTop: 2 }}>Link to any online profile picture</AppText>
-            </View>
-            <CaretRightIcon size={14} color={colors.fg4} />
-          </Pressable>
-
-          {showUrlInput ? (
-            <View style={{ gap: spacing.s2, marginTop: spacing.s1 }}>
-              <Field
-                placeholder="https://example.com/photo.jpg"
-                value={customUrl}
-                onChangeText={setCustomUrl}
-              />
-              <Button variant="primary" size="md" onPress={handleApplyCustomUrl}>
-                Preview link
-              </Button>
-            </View>
-          ) : null}
-
-          {/* Option: Remove Photo */}
+          {/* Option 4: Remove Photo */}
           {profile.avatarUri ? (
             <Pressable
               onPress={handleRemovePhoto}
               style={{
-                marginTop: spacing.s2,
+                marginTop: spacing.s3,
                 paddingVertical: 14,
                 borderWidth: 1,
                 borderColor: colors.borderSubtle,

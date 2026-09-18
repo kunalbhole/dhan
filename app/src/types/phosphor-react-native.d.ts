@@ -22,6 +22,18 @@ declare module 'phosphor-react-native/lib/module/icons/ShieldCheck' {
   export const ShieldCheckIcon: Icon;
 }
 
+declare module 'phosphor-react-native/lib/module/icons/Image' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Image: Icon;
+  export const ImageIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Camera' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Camera: Icon;
+  export const CameraIcon: Icon;
+}
+
 declare module 'phosphor-react-native/lib/module/icons/ArrowRight' {
   import type { Icon } from 'phosphor-react-native';
   export const ArrowRight: Icon;
