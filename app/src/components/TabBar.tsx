@@ -31,7 +31,10 @@ const TABS: TabDef[] = [
 ];
 
 export interface TabBarProps {
-  active: TabId;
+  // null for screens reached via the D-logo menu (e.g. Settings/More) —
+  // app.jsx renders this same bar there with `tab="more"`, which matches
+  // none of TabBar's own 5 ids, so nothing highlights. Same idea here.
+  active: TabId | null;
   onChange?: (id: TabId) => void;
 }
 

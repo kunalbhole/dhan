@@ -1,8 +1,14 @@
 // Ported verbatim from Dhan App 2/screens-main.jsx's FRAMEWORKS,
 // FRAMEWORK_BUCKETS, BUCKETS, EXTRA_BUCKETS, and frameworkBuckets() — the
 // canonical data other onboarding/budget screens are meant to share.
+import type { ComponentType } from 'react';
+import { HouseLineIcon } from 'phosphor-react-native/lib/module/icons/HouseLine';
+import { ConfettiIcon } from 'phosphor-react-native/lib/module/icons/Confetti';
+import { PiggyBankIcon } from 'phosphor-react-native/lib/module/icons/PiggyBank';
+import { CreditCardIcon } from 'phosphor-react-native/lib/module/icons/CreditCard';
 import { colors } from '../theme';
 import { CATEGORIES } from './categories';
+import type { PhosphorIconProps } from '../components/IconChip';
 
 export interface FrameworkOption {
   id: string;
@@ -64,21 +70,23 @@ interface BucketMeta {
   color: string;
   cats?: string[];
   spent?: number;
+  icon: ComponentType<PhosphorIconProps>;
+  tint: string;
 }
 
 // `spent` values are the reference's own hardcoded placeholder figures
 // (screens-main.jsx's BUCKETS) — sample data, not derived from real
 // transactions, same status as SAMPLE_TXNS elsewhere.
 const BUCKETS: Record<string, BucketMeta> = {
-  needs: { color: colors.navy, cats: ['rent', 'bills', 'groceries', 'transport', 'health'], spent: 16180 },
-  wants: { color: colors.gold, cats: ['food', 'shopping', 'ent', 'travel'], spent: 10900 },
-  savings: { color: colors.income, cats: ['income', 'edu'], spent: 5100 },
+  needs: { color: colors.navy, cats: ['rent', 'bills', 'groceries', 'transport', 'health'], spent: 16180, icon: HouseLineIcon, tint: colors.bgSurface },
+  wants: { color: colors.gold, cats: ['food', 'shopping', 'ent', 'travel'], spent: 10900, icon: ConfettiIcon, tint: colors.goldBg },
+  savings: { color: colors.income, cats: ['income', 'edu'], spent: 5100, icon: PiggyBankIcon, tint: colors.incomeBg },
 };
 
 // Not part of colors_and_type.css's tokens — matches CATEGORIES.cc's color
 // in the source, kept literal like the bank-brand colors elsewhere.
 const EXTRA_BUCKETS: Record<string, BucketMeta> = {
-  debt: { color: '#C4696B' },
+  debt: { color: '#C4696B', icon: CreditCardIcon, tint: colors.expenseBg },
 };
 
 export interface FrameworkBucket {
@@ -88,6 +96,8 @@ export interface FrameworkBucket {
   color: string;
   cats: string[];
   spent: number;
+  icon: ComponentType<PhosphorIconProps>;
+  tint: string;
 }
 
 export function frameworkBuckets(fwId: string): FrameworkBucket[] {
@@ -100,6 +110,6 @@ export function frameworkBuckets(fwId: string): FrameworkBucket[] {
       used.add(cat);
       return true;
     });
-    return { id, label, pct, color: base.color, cats: list, spent: base.spent || 0 };
+    return { id, label, pct, color: base.color, cats: list, spent: base.spent || 0, icon: base.icon, tint: base.tint };
   });
 }

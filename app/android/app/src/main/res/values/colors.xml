@@ -1,0 +1,6 @@
+<resources>
+    <!-- Adaptive icon background — matches the D-mark's own white field
+         (see src/assets/DhanMark.tsx / Dhan App 2/assets/dhan-mark.svg),
+         same choice as every other surface the mark appears on in-app. -->
+    <color name="ic_launcher_background">#FFFFFF</color>
+</resources>

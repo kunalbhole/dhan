@@ -4,7 +4,7 @@
  */
 
 import { useEffect } from 'react';
-import { StatusBar, useColorScheme } from 'react-native';
+import { AppState, StatusBar, View, useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 // Deep import into the compiled module, not the package root — the root
 // barrel re-exports all ~1500 icons (and phosphor-react-native ships three
@@ -13,9 +13,12 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 // path pulls in only what's actually used.
 import { IconContext } from 'phosphor-react-native/lib/module/lib';
 import RootNavigator from './src/navigation/RootNavigator';
+import Toast from './src/components/Toast';
+import GlobalAddSheet from './src/components/GlobalAddSheet';
 import { colors } from './src/theme';
 import { addSmsListener } from './src/native/sms';
 import { processIncomingSms } from './src/lib/smsPipeline';
+import { maybeRunScheduledBackup } from './src/lib/backupScheduler';
 
 // App-wide icon defaults: regular weight, sized/colored to the design
 // system. Individual icons override `weight="fill"` for active/selected
@@ -38,11 +41,27 @@ function App() {
     return () => sub.remove();
   }, []);
 
+  // Foreground-triggered backup check (src/lib/backupScheduler.ts) — no
+  // true OS-level background scheduling, so this is what makes "periodic"
+  // actually run: once on mount, then again every time the app comes back
+  // to the foreground. Silent by design — never shows anything on its own.
+  useEffect(() => {
+    maybeRunScheduledBackup();
+    const sub = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active') maybeRunScheduledBackup();
+    });
+    return () => sub.remove();
+  }, []);
+
   return (
     <SafeAreaProvider>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
       <IconContext.Provider value={iconDefaults}>
-        <RootNavigator />
+        <View style={{ flex: 1 }}>
+          <RootNavigator />
+          <Toast />
+          <GlobalAddSheet />
+        </View>
       </IconContext.Provider>
     </SafeAreaProvider>
   );

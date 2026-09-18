@@ -1,8 +1,10 @@
 import { Pressable, View } from 'react-native';
 import { MagnifyingGlassIcon } from 'phosphor-react-native/lib/module/icons/MagnifyingGlass';
 import { BellIcon } from 'phosphor-react-native/lib/module/icons/Bell';
+import { PlusIcon } from 'phosphor-react-native/lib/module/icons/Plus';
 import DhanMark from '../assets/DhanMark';
 import { colors, radii, spacing } from '../theme';
+import { openAddSheet } from '../lib/addSheet';
 
 export interface AppHeaderProps {
   onMenu?: () => void;
@@ -12,7 +14,12 @@ export interface AppHeaderProps {
 }
 
 // Ported from components.jsx's AppHeader — logo button (opens More) on the
-// left, search + notifications (with unread dot) on the right.
+// left, search + notifications (with unread dot) on the right. The "+" is
+// new, not in the reference: a single global add action (opens the action
+// sheet in GlobalAddSheet.tsx via src/lib/addSheet.ts, the same
+// session-only pub-sub pattern as showToast()) replacing what used to be a
+// separate "+" button duplicated on Home, Transactions, Bills, Budget and
+// Splits.
 function AppHeader({ onMenu, onSearch, onNotify, unread = true }: AppHeaderProps) {
   return (
     <View
@@ -53,6 +60,9 @@ function AppHeader({ onMenu, onSearch, onNotify, unread = true }: AppHeaderProps
               }}
             />
           ) : null}
+        </Pressable>
+        <Pressable onPress={openAddSheet} accessibilityLabel="Add" style={[headerBtnStyle, { backgroundColor: colors.navy, borderWidth: 0 }]}>
+          <PlusIcon size={20} color={colors.fgOnDark} />
         </Pressable>
       </View>
     </View>

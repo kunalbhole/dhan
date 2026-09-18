@@ -17,3 +17,39 @@ export async function setOnboarded(): Promise<void> {
 export async function clearOnboarded(): Promise<void> {
   await AsyncStorage.removeItem(ONBOARDED_KEY);
 }
+
+// The two onboarding choices HomeScreen's budget math is built on:
+// monthly income (IncomeSetupScreen) and the budgeting framework
+// (FrameworkScreen). Mirrors app.jsx's own localStorage keys
+// ("dhan-income" doesn't exist there — the prototype never persists
+// income at all — but "dhan-framework" does, so that key name is kept).
+const INCOME_KEY = 'dhan-income';
+const FRAMEWORK_KEY = 'dhan-framework';
+export const DEFAULT_FRAMEWORK = '50-30-20';
+
+export async function setMonthlyIncome(amount: number): Promise<void> {
+  await AsyncStorage.setItem(INCOME_KEY, String(amount));
+}
+
+// null means "never set" — distinct from 0, which a user could genuinely
+// enter. Callers decide how to render the not-yet-set case.
+export async function getMonthlyIncome(): Promise<number | null> {
+  const v = await AsyncStorage.getItem(INCOME_KEY);
+  return v === null ? null : parseInt(v, 10);
+}
+
+export async function setFramework(id: string): Promise<void> {
+  await AsyncStorage.setItem(FRAMEWORK_KEY, id);
+}
+
+export async function getFramework(): Promise<string> {
+  const v = await AsyncStorage.getItem(FRAMEWORK_KEY);
+  return v ?? DEFAULT_FRAMEWORK;
+}
+
+// A full local reset — sign-out clears these alongside the onboarded
+// flag so a relaunch's onboarding starts genuinely fresh, not carrying
+// over the previous account's income/framework.
+export async function clearUserPrefs(): Promise<void> {
+  await AsyncStorage.removeMany([INCOME_KEY, FRAMEWORK_KEY]);
+}

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "31872242503",
+    "project_id": "dhan-25545",
+    "storage_bucket": "dhan-25545.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:31872242503:android:02f8ebaba195f80d49f262",
+        "android_client_info": {
+          "package_name": "com.dhanapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyADu4IlT-dXEbtT3TYCkE0fT_Z25Gc8pbg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

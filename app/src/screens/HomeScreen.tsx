@@ -2,7 +2,6 @@ import { useEffect, useState, type ComponentType } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { PlusIcon } from 'phosphor-react-native/lib/module/icons/Plus';
 import { ArrowDownLeftIcon } from 'phosphor-react-native/lib/module/icons/ArrowDownLeft';
 import { ArrowUpRightIcon } from 'phosphor-react-native/lib/module/icons/ArrowUpRight';
 import { MinusCircleIcon } from 'phosphor-react-native/lib/module/icons/MinusCircle';
@@ -21,30 +20,27 @@ import TxnRow from '../components/TxnRow';
 import UncatCard from '../components/UncatCard';
 import InsightsTeaser from '../components/InsightsTeaser';
 import { colors, radii, shadows, spacing } from '../theme';
-import { frameworkBuckets } from '../lib/frameworks';
-import { UPCOMING_BILLS } from '../lib/sampleData';
-import { BILL_ICONS } from '../lib/billIcons';
+import { frameworkBuckets, type FrameworkBucket } from '../lib/frameworks';
+import type { Bill } from '../lib/bills';
+import { CATEGORY_ICONS } from '../lib/categoryIcons';
+import { getBills, subscribeToBills } from '../lib/billsStore';
 import { formatIndianNumber, formatTime } from '../lib/format';
+import { currentMonthLabel, daysLeftInMonth, daysUntil, formatShortDate, isThisMonth } from '../lib/dateRange';
+import { getMonthlyIncome, getFramework, DEFAULT_FRAMEWORK } from '../lib/account';
+import { spentOn } from '../lib/budget';
 import { getRecentTransactions, getUncategorisedTransactions, subscribeToTransactionsChanged, type StoredTransaction } from '../lib/db';
 import type { PhosphorIconProps } from '../components/IconChip';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
-// Reference-hardcoded sample figures (screens-main.jsx's HomeScreen).
-// Recent transactions and Uncategorised below are now backed by the real
-// SQLite table (src/lib/db.ts); these balance/budget totals still aren't —
-// that needs a real ledger/budget-cap model this app doesn't have yet.
+// Reference-hardcoded sample figures (screens-main.jsx's HomeScreen) — this
+// app has no user-profile storage yet, so the display name/greeting stay
+// as-is. The balance/budget totals below are real now: income comes from
+// IncomeSetupScreen, the framework from FrameworkScreen (both persisted in
+// src/lib/account.ts), and spend comes from this month's real transactions.
 const USER_NAME = 'Priya';
 const GREETING = 'Morning';
-const BALANCE = 124500;
-const BALANCE_IN = 82500;
-const BALANCE_OUT = 32180;
-const BUDGET_CAP_TOTAL = 50000;
-const BUDGET_SPENT_TOTAL = 32180;
-const BUDGET_LEFT = 17820;
-const BUDGET_DAYS_LEFT = 11;
-const BUDGET_PCT = 64;
 
 interface QuickAction {
   id: string;
@@ -59,13 +55,14 @@ const QUICK_ACTIONS: QuickAction[] = [
   { id: 'insights', label: 'Insights', icon: ChartLineUpIcon, color: colors.info },
 ];
 
-// None of the destinations below (More, Search, Notifications, Insights,
-// Budget, Transactions, Goals, Bills, Add-txn sheet) exist as screens yet
-// — every interactive element here is wired to this stub so the UI is
-// visually and interactively complete without crashing on a route that
-// doesn't exist. Replace with real navigation.navigate calls as each
-// destination screen gets built. (Txn detail is real now — see the
-// TxnRow onPress below.)
+// None of the destinations below (Insights, Goals, Add-txn sheet,
+// Uncategorised) exist as screens yet — every interactive element here is
+// wired to this stub so the UI is visually and interactively complete
+// without crashing on a route that doesn't exist. Replace with real
+// navigation.navigate calls as each destination screen gets built. (Txn
+// detail, More/Settings, Search, Notifications, Transactions, Budget,
+// Bills and Splits are real now — see the TxnRow onPress, AppHeader
+// onMenu/onSearch/onNotify, and the Txns/Budget/Bills/Split tabs below.)
 const stubNav = (dest: string) => {
   // eslint-disable-next-line no-console
   console.log('[HomeScreen] nav ->', dest);
@@ -81,19 +78,40 @@ function txnMeta(row: StoredTransaction): string {
 
 function HomeScreen({ navigation }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('home');
-  const [recentTxns, setRecentTxns] = useState<StoredTransaction[]>([]);
+  const [allTxns, setAllTxns] = useState<StoredTransaction[]>([]);
   const [uncatTxns, setUncatTxns] = useState<StoredTransaction[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const buckets = frameworkBuckets('50-30-20');
-  const upcomingBills = UPCOMING_BILLS.filter(b => b.status !== 'paid').slice(0, 4);
+  const [bills, setBills] = useState<Bill[]>(getBills());
+  const [income, setIncome] = useState<number | null>(null);
+  const [framework, setFrameworkId] = useState(DEFAULT_FRAMEWORK);
+  const buckets = frameworkBuckets(framework);
+  const upcomingBills = bills.filter(b => b.status === 'upcoming' || b.status === 'due-soon').slice(0, 4);
+  const recentTxns = allTxns.slice(0, 4);
+
+  useEffect(() => subscribeToBills(() => setBills([...getBills()])), []);
+
+  // Onboarding's own choices — reloaded on every focus (not just mount) so
+  // a value changed elsewhere (e.g. a future "edit income" screen) shows
+  // up here without a full app restart.
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      Promise.all([getMonthlyIncome(), getFramework()]).then(([storedIncome, storedFramework]) => {
+        setIncome(storedIncome);
+        setFrameworkId(storedFramework);
+      });
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   useEffect(() => {
     let alive = true;
     const load = () => {
-      Promise.all([getRecentTransactions(4), getUncategorisedTransactions(12)])
-        .then(([recent, uncat]) => {
+      // A high limit rather than a second query — this month's spend needs
+      // every transaction, not just the 4 shown in "Recent transactions".
+      Promise.all([getRecentTransactions(1000), getUncategorisedTransactions(12)])
+        .then(([all, uncat]) => {
           if (!alive) return;
-          setRecentTxns(recent);
+          setAllTxns(all);
           setUncatTxns(uncat);
           setLoaded(true);
         })
@@ -112,35 +130,27 @@ function HomeScreen({ navigation }: Props) {
     };
   }, []);
 
+  const monthTxns = allTxns.filter(t => isThisMonth(t.timestamp));
+  const budgetCapTotal = income ?? 0;
+  const budgetSpentTotal = monthTxns.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const budgetLeft = Math.max(0, budgetCapTotal - budgetSpentTotal);
+  const budgetPct = budgetCapTotal > 0 ? Math.min(100, Math.round((budgetSpentTotal / budgetCapTotal) * 100)) : 0;
+  const balanceIn = income ?? 0;
+  const balanceOut = budgetSpentTotal;
+  const balance = balanceIn - balanceOut;
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bgSurface }} edges={['top', 'bottom']}>
-      <AppHeader onMenu={() => stubNav('more')} onSearch={() => stubNav('search')} onNotify={() => stubNav('notifications')} />
+      <AppHeader onMenu={() => navigation.navigate('Settings')} onSearch={() => navigation.navigate('Search')} onNotify={() => navigation.navigate('Notifications')} />
 
       <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.s4, paddingTop: spacing.s2, paddingBottom: spacing.s6 }}>
-        {/* Greeting + Add */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: spacing.s2, paddingHorizontal: 4, marginBottom: spacing.s2 }}>
-          <View>
-            <AppText style={{ fontSize: 13, color: colors.fg3 }}>{GREETING},</AppText>
-            <AppText weight="bold" style={{ fontSize: 20 }}>
-              {USER_NAME} 👋
-            </AppText>
-          </View>
-          <Pressable
-            accessibilityLabel="Add"
-            onPress={() => stubNav('add-txn')}
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: radii.input,
-              backgroundColor: colors.bgElevated,
-              borderWidth: 1,
-              borderColor: colors.borderSubtle,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <PlusIcon size={20} color={colors.navy} />
-          </Pressable>
+        {/* Greeting — the "+" that used to sit here moved into AppHeader
+            (GlobalAddSheet.tsx), shared across every screen. */}
+        <View style={{ paddingVertical: spacing.s2, paddingHorizontal: 4, marginBottom: spacing.s2 }}>
+          <AppText style={{ fontSize: 13, color: colors.fg3 }}>{GREETING},</AppText>
+          <AppText weight="bold" style={{ fontSize: 20 }}>
+            {USER_NAME} 👋
+          </AppText>
         </View>
 
         {/* Balance hero */}
@@ -156,10 +166,10 @@ function HomeScreen({ navigation }: Props) {
           ]}
         >
           <AppText weight="semibold" style={{ fontSize: 11, color: colors.fgOnDark, opacity: 0.7 }}>
-            Balance · April
+            Balance · {currentMonthLabel()}
           </AppText>
           <AppText weight="bold" style={{ fontSize: 34, color: colors.fgOnDark, marginTop: 6, marginBottom: 14, fontVariant: ['tabular-nums'] }}>
-            ₹{formatIndianNumber(BALANCE)}
+            {balance < 0 ? '−' : ''}₹{formatIndianNumber(balance)}
             <AppText weight="bold" style={{ fontSize: 18, color: colors.fgOnDark, opacity: 0.6 }}>
               .00
             </AppText>
@@ -168,13 +178,13 @@ function HomeScreen({ navigation }: Props) {
             <View style={heroPillStyle('rgba(255,217,119,0.15)')}>
               <ArrowDownLeftIcon size={14} color={colors.goldSoft} />
               <AppText weight="semibold" style={{ fontSize: 12, color: colors.goldSoft }}>
-                + ₹{formatIndianNumber(BALANCE_IN)}
+                + ₹{formatIndianNumber(balanceIn)}
               </AppText>
             </View>
             <View style={heroPillStyle('rgba(255,255,255,0.1)')}>
               <ArrowUpRightIcon size={14} color={colors.fgOnDark} />
               <AppText weight="semibold" style={{ fontSize: 12, color: colors.fgOnDark }}>
-                − ₹{formatIndianNumber(BALANCE_OUT)}
+                − ₹{formatIndianNumber(balanceOut)}
               </AppText>
             </View>
           </View>
@@ -228,24 +238,25 @@ function HomeScreen({ navigation }: Props) {
         />
 
         {/* This month's budget */}
-        <SectionHeader title="This month's budget" onSeeAll={() => stubNav('budget')} />
+        <SectionHeader title="This month's budget" onSeeAll={() => navigation.navigate('Budget')} />
         <Card style={{ marginBottom: spacing.s4 }}>
           <View style={{ marginBottom: spacing.s3 }}>
             <AppText weight="bold" style={{ fontSize: 24, fontVariant: ['tabular-nums'] }}>
-              ₹{formatIndianNumber(BUDGET_SPENT_TOTAL)}{' '}
-              <AppText style={{ fontSize: 14, color: colors.fg3 }}>of ₹{formatIndianNumber(BUDGET_CAP_TOTAL)}</AppText>
+              ₹{formatIndianNumber(budgetSpentTotal)}{' '}
+              <AppText style={{ fontSize: 14, color: colors.fg3 }}>of ₹{formatIndianNumber(budgetCapTotal)}</AppText>
             </AppText>
             <AppText style={{ fontSize: 12, color: colors.fg3, marginTop: 2 }}>
-              ₹{formatIndianNumber(BUDGET_LEFT)} left · {BUDGET_DAYS_LEFT} days to go
+              ₹{formatIndianNumber(budgetLeft)} left · {daysLeftInMonth()} days to go
             </AppText>
           </View>
           <View style={{ height: 8, backgroundColor: colors.bgSurface, borderRadius: radii.pill, overflow: 'hidden', marginBottom: spacing.s3 + 2 }}>
-            <View style={{ width: `${BUDGET_PCT}%`, height: '100%', backgroundColor: colors.navy, borderRadius: radii.pill }} />
+            <View style={{ width: `${budgetPct}%`, height: '100%', backgroundColor: colors.navy, borderRadius: radii.pill }} />
           </View>
-          {buckets.map(b => {
-            const cap = Math.round((BUDGET_CAP_TOTAL * b.pct) / 100);
-            const over = b.spent > cap;
-            const pct = Math.min(100, Math.round((b.spent / cap) * 100));
+          {buckets.map((b: FrameworkBucket) => {
+            const cap = Math.round((budgetCapTotal * b.pct) / 100);
+            const spent = spentOn(monthTxns, b.cats);
+            const over = spent > cap;
+            const pct = cap > 0 ? Math.min(100, Math.round((spent / cap) * 100)) : 0;
             return (
               <View key={b.id} style={{ marginTop: spacing.s3 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -257,7 +268,7 @@ function HomeScreen({ navigation }: Props) {
                   </View>
                   <AppText weight="semibold" style={{ fontSize: 12, fontVariant: ['tabular-nums'] }}>
                     <AppText weight="semibold" style={{ fontSize: 12, color: over ? colors.expense : colors.fg1 }}>
-                      ₹{formatIndianNumber(b.spent)}
+                      ₹{formatIndianNumber(spent)}
                     </AppText>{' '}
                     <AppText style={{ fontSize: 12, color: colors.fg3 }}>/ ₹{formatIndianNumber(cap)}</AppText>
                   </AppText>
@@ -276,7 +287,7 @@ function HomeScreen({ navigation }: Props) {
             transactions" is a permanent section per CLAUDE.md's fixed
             order, not a conditional nudge). Nothing renders until the
             first load resolves, to avoid a flash of the empty state. */}
-        <SectionHeader title="Recent transactions" onSeeAll={() => stubNav('txn')} />
+        <SectionHeader title="Recent transactions" onSeeAll={() => navigation.navigate('Transactions')} />
         <Card style={{ paddingVertical: 4, paddingHorizontal: spacing.s4, marginBottom: spacing.s4 }}>
           {!loaded ? null : recentTxns.length === 0 ? (
             <View style={{ alignItems: 'center', paddingVertical: spacing.s5, gap: spacing.s2 }}>
@@ -345,7 +356,7 @@ function HomeScreen({ navigation }: Props) {
         </Card>
 
         {/* Upcoming bills */}
-        <SectionHeader title="Upcoming bills" onSeeAll={() => stubNav('bills')} />
+        <SectionHeader title="Upcoming bills" onSeeAll={() => navigation.navigate('Bills')} />
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -353,7 +364,8 @@ function HomeScreen({ navigation }: Props) {
           style={{ marginHorizontal: -spacing.s4, paddingHorizontal: spacing.s4 }}
         >
           {upcomingBills.map(b => {
-            const Icon = BILL_ICONS[b.icon];
+            const Icon = CATEGORY_ICONS[b.category] ?? CATEGORY_ICONS.other;
+            const dueIn = daysUntil(b.dueDate);
             return (
               <View
                 key={b.id}
@@ -381,12 +393,12 @@ function HomeScreen({ navigation }: Props) {
                   >
                     <Icon size={16} color={colors.navy} />
                   </View>
-                  <StatusPill tone={b.status === 'due-soon' ? 'warning' : 'info'}>{b.dueIn <= 0 ? 'Today' : `${b.dueIn}d`}</StatusPill>
+                  <StatusPill tone={b.status === 'due-soon' ? 'warning' : 'info'}>{dueIn <= 0 ? 'Today' : `${dueIn}d`}</StatusPill>
                 </View>
                 <AppText weight="semibold" style={{ fontSize: 13 }}>
                   {b.name}
                 </AppText>
-                <AppText style={{ fontSize: 11, color: colors.fg3 }}>Due {b.due}</AppText>
+                <AppText style={{ fontSize: 11, color: colors.fg3 }}>Due {formatShortDate(b.dueDate)}</AppText>
                 <AppText weight="semibold" style={{ fontSize: 15, marginTop: 2, fontVariant: ['tabular-nums'] }}>
                   ₹{formatIndianNumber(b.amt)}
                 </AppText>
@@ -396,7 +408,17 @@ function HomeScreen({ navigation }: Props) {
         </ScrollView>
       </ScrollView>
 
-      <TabBar active={activeTab} onChange={id => (id === 'home' ? setActiveTab(id) : stubNav(id))} />
+      <TabBar
+        active={activeTab}
+        onChange={id => {
+          if (id === 'home') setActiveTab(id);
+          else if (id === 'txn') navigation.navigate('Transactions');
+          else if (id === 'budget') navigation.navigate('Budget');
+          else if (id === 'bills') navigation.navigate('Bills');
+          else if (id === 'split') navigation.navigate('Splits');
+          else stubNav(id);
+        }}
+      />
     </SafeAreaView>
   );
 }

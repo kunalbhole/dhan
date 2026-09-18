@@ -16,6 +16,7 @@ export interface DetailRowProps {
   iconColor?: string;
   iconBg?: string;
   label: string;
+  labelColor?: string;
   sub?: string;
   children?: ReactNode;
   last?: boolean;
@@ -23,7 +24,7 @@ export interface DetailRowProps {
   chevron?: boolean;
 }
 
-function DetailRow({ icon, iconColor, iconBg, label, sub, children, last = false, onPress, chevron = false }: DetailRowProps) {
+function DetailRow({ icon, iconColor, iconBg, label, labelColor, sub, children, last = false, onPress, chevron = false }: DetailRowProps) {
   const content = (
     <View
       style={{
@@ -37,7 +38,7 @@ function DetailRow({ icon, iconColor, iconBg, label, sub, children, last = false
     >
       <IconChip icon={icon} color={iconColor} bg={iconBg} />
       <View style={{ flex: 1, minWidth: 0 }}>
-        <AppText style={{ fontSize: 14, color: colors.fg2 }}>{label}</AppText>
+        <AppText style={{ fontSize: 14, color: labelColor ?? colors.fg2 }}>{label}</AppText>
         {sub ? (
           <AppText style={{ fontSize: 12, color: colors.fg3, marginTop: 2 }}>{sub}</AppText>
         ) : null}

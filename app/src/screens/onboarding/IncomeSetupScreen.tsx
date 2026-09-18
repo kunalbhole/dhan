@@ -7,6 +7,7 @@ import AppText from '../../components/AppText';
 import Button from '../../components/Button';
 import ScreenHeader from '../../components/ScreenHeader';
 import { colors, radii, spacing, typography } from '../../theme';
+import { setMonthlyIncome } from '../../lib/account';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'IncomeSetup'>;
@@ -50,7 +51,14 @@ function IncomeSetupScreen({ navigation }: Props) {
     setIncome(digitsOnly ? parseInt(digitsOnly, 10) : 0);
   };
 
-  const goNext = () => navigation.navigate('Framework');
+  // Reference has no persistence layer for this at all (it's local
+  // component state that just gets thrown away) — this app has a real
+  // one (src/lib/account.ts), and HomeScreen's budget math depends on
+  // this being saved.
+  const goNext = async () => {
+    await setMonthlyIncome(income);
+    navigation.navigate('Framework');
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>

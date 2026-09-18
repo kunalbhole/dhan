@@ -1,7 +1,8 @@
-// Ported verbatim from Dhan App 2/screens-main.jsx's SAMPLE_TXNS,
-// UNCAT_TXNS, and UPCOMING_BILLS — placeholder data the prototype itself
-// uses, not real user data. `icon` fields are phosphor slugs (see
-// src/lib/categories.ts's comment on why they're strings, not components).
+// Ported verbatim from Dhan App 2/screens-main.jsx's SAMPLE_TXNS and
+// UNCAT_TXNS — placeholder data the prototype itself uses, not real user
+// data. `icon` fields are phosphor slugs (see src/lib/categories.ts's
+// comment on why they're strings, not components). UPCOMING_BILLS used to
+// live here too; bills are real now (see src/lib/bills.ts).
 
 export interface SampleTxn {
   id: number;
@@ -75,22 +76,69 @@ export const UNCAT_TXNS: UncatTxn[] = [
   { id: 'u12', m: 'Card swipe · POS', s: 'HDFC ••4521 · Apr 17', a: -250 },
 ];
 
-export interface UpcomingBill {
-  id: string;
-  name: string;
-  amt: number;
-  due: string;
-  dueIn: number;
-  icon: string;
-  status: 'upcoming' | 'due-soon' | 'paid';
+// Ported from screens-main.jsx's BudgetScreen `budgets` array — hardcoded
+// per-category spend/cap sample figures, same status as SAMPLE_TXNS.
+export interface CategoryBudget {
+  cat: string;
+  spent: number;
+  cap: number;
 }
 
-export const UPCOMING_BILLS: UpcomingBill[] = [
-  { id: 'rent', name: 'Rent', amt: 24000, due: 'May 1', dueIn: 8, icon: 'house', status: 'upcoming' },
-  { id: 'airtel', name: 'Airtel Fiber', amt: 1199, due: 'Apr 26', dueIn: 3, icon: 'wifi-high', status: 'due-soon' },
-  { id: 'spotify', name: 'Spotify', amt: 119, due: 'Apr 28', dueIn: 5, icon: 'spotify-logo', status: 'due-soon' },
-  { id: 'netflix', name: 'Netflix', amt: 649, due: 'May 4', dueIn: 11, icon: 'television-simple', status: 'upcoming' },
-  { id: 'elec', name: 'Electricity', amt: 2340, due: 'Apr 18', dueIn: -5, icon: 'lightning', status: 'paid' },
-  { id: 'gas', name: 'Piped Gas', amt: 480, due: 'May 6', dueIn: 13, icon: 'flame', status: 'upcoming' },
-  { id: 'gym', name: 'Cult.fit', amt: 899, due: 'Apr 30', dueIn: 7, icon: 'barbell', status: 'due-soon' },
+export const BUDGET_CATEGORIES: CategoryBudget[] = [
+  { cat: 'food', spent: 3200, cap: 5000 },
+  { cat: 'transport', spent: 1480, cap: 3000 },
+  { cat: 'shopping', spent: 6200, cap: 5000 },
+  { cat: 'bills', spent: 4299, cap: 6000 },
+  { cat: 'ent', spent: 1120, cap: 2000 },
+  { cat: 'health', spent: 615, cap: 1500 },
+  { cat: 'groceries', spent: 3840, cap: 4000 },
 ];
+
+// Ported from budget-edit.jsx's SAVINGS_SUBS — savings goals rather than
+// spend categories, shown nested under the "Savings" bucket.
+export interface SavingsSub {
+  id: string;
+  name: string;
+  spent: number;
+  cap: number;
+  color: string;
+}
+
+export const SAVINGS_SUBS: SavingsSub[] = [
+  { id: 'invest', name: 'Investing', spent: 2600, cap: 5000, color: '#2E7D5B' },
+  { id: 'insurance', name: 'Insurance', spent: 1200, cap: 1500, color: '#4F8FAF' },
+  { id: 'debt', name: 'Debt pay-off', spent: 1300, cap: 2000, color: '#B08D57' },
+];
+
+// Ported from app.jsx's seed `projectBudgets` state — the one example
+// project budget (Marriage) the prototype ships with.
+export interface BudgetLine {
+  name: string;
+  spent: number;
+  cap: number;
+}
+
+export interface ProjectBudget {
+  id: string;
+  name: string;
+  subtitle: string;
+  lines: BudgetLine[];
+}
+
+export const PROJECT_BUDGETS: ProjectBudget[] = [
+  {
+    id: 'marriage',
+    name: 'Marriage',
+    subtitle: 'Dec 2026 · project budget',
+    lines: [
+      { name: 'Venue & catering', spent: 180000, cap: 400000 },
+      { name: 'Outfits & jewellery', spent: 96000, cap: 250000 },
+      { name: 'Photography', spent: 40000, cap: 120000 },
+      { name: 'Travel & stay', spent: 0, cap: 90000 },
+    ],
+  },
+];
+
+// UpcomingBill/UPCOMING_BILLS used to live here — replaced by src/lib/
+// bills.ts's real `Bill` type. Bills are no longer seeded from sample
+// data; they come from src/lib/billsStore.ts (manual adds + detection).

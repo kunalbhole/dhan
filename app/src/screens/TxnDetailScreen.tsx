@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -26,11 +26,17 @@ import DetailRow from '../components/DetailRow';
 import IconChip from '../components/IconChip';
 import BottomSheet from '../components/BottomSheet';
 import SelectIndicator from '../components/SelectIndicator';
+import SplitSheet from '../components/SplitSheet';
 import { colors, radii, spacing, typography } from '../theme';
 import { CATEGORIES } from '../lib/categories';
 import { CATEGORY_ICONS } from '../lib/categoryIcons';
 import { formatDay } from '../lib/format';
-import { deleteTransaction } from '../lib/db';
+import { frameworkBuckets } from '../lib/frameworks';
+import { getMonthlyIncome, getFramework, DEFAULT_FRAMEWORK } from '../lib/account';
+import { spentOn } from '../lib/budget';
+import { isThisMonth } from '../lib/dateRange';
+import { showToast } from '../lib/toast';
+import { deleteTransaction, getRecentTransactions, type StoredTransaction } from '../lib/db';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TxnDetail'>;
@@ -53,13 +59,13 @@ function fmt(n: number, d = 2): string {
 // learned-budget-suggestion banner, group/split context rows — stay out
 // entirely rather than rendered-but-stubbed, matching the reference's own
 // conditional rendering (it hides them too when that data is absent).
-// "Split with friends" and the 3-dot "Share screenshot" action are real
-// UI from the reference kept as no-op taps: Split is a future screen
-// (Splits tab, not yet built) and "Share screenshot" is a no-op in the
-// reference itself (its own handler only closes the menu).
+// "Split with friends" now opens the real SplitSheet (the Splits tab is
+// built). The 3-dot "Share screenshot" action stays a no-op — that's a
+// no-op in the reference itself too (its own handler only closes the menu).
 function TxnDetailScreen({ route, navigation }: Props) {
   const { transaction: t } = route.params;
   const [menu, setMenu] = useState(false);
+  const [splitOpen, setSplitOpen] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const [budgetPick, setBudgetPick] = useState(false);
   const [budgetId] = useState('personal');
@@ -69,12 +75,33 @@ function TxnDetailScreen({ route, navigation }: Props) {
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [income, setIncome] = useState<number | null>(null);
+  const [framework, setFrameworkId] = useState(DEFAULT_FRAMEWORK);
+  const [monthTxns, setMonthTxns] = useState<StoredTransaction[]>([]);
 
   const isIncome = t.amount > 0;
   const cat = CATEGORIES[t.category] || CATEGORIES.other;
   const CatIcon = CATEGORY_ICONS[t.category] || CATEGORY_ICONS.other;
   const merchant = t.merchant ?? 'Unknown';
   const day = formatDay(t.timestamp);
+
+  // Real budget-impact data for the "Mini budget impact" card below — the
+  // bucket (Needs/Wants/Savings) this transaction's category rolls up
+  // into, same source HomeScreen and BudgetScreen use. There's no real
+  // per-category cap yet, only the 3-bucket split from onboarding, so the
+  // card reports impact at that level rather than a fabricated category cap.
+  useEffect(() => {
+    Promise.all([getMonthlyIncome(), getFramework(), getRecentTransactions(1000)]).then(([storedIncome, storedFramework, all]) => {
+      setIncome(storedIncome);
+      setFrameworkId(storedFramework);
+      setMonthTxns(all.filter(row => isThisMonth(row.timestamp)));
+    });
+  }, []);
+
+  const bucket = frameworkBuckets(framework).find(b => b.cats.includes(t.category)) ?? null;
+  const bucketCap = bucket ? Math.round(((income ?? 0) * bucket.pct) / 100) : 0;
+  const bucketSpent = bucket ? spentOn(monthTxns, bucket.cats) : 0;
+  const bucketPct = bucketCap ? Math.min(100, Math.round((bucketSpent / bucketCap) * 100)) : 0;
 
   const addTag = () => {
     if (newTag && newTag.trim()) setTags(ts => [...ts, newTag.trim()]);
@@ -85,6 +112,7 @@ function TxnDetailScreen({ route, navigation }: Props) {
     setConfirmDel(false);
     setDeleting(true);
     await deleteTransaction(t.id);
+    showToast('Transaction deleted');
     navigation.goBack();
   };
 
@@ -319,27 +347,31 @@ function TxnDetailScreen({ route, navigation }: Props) {
         </Card>
 
         {/* Split action */}
-        <Card onPress={() => {}} style={{ paddingHorizontal: spacing.s4, paddingVertical: 0, marginBottom: spacing.s3 }}>
-          <DetailRow icon={UsersThreeIcon} label="Split with friends" sub="Share this expense · equal or custom" last chevron onPress={() => {}} />
+        <Card onPress={() => setSplitOpen(true)} style={{ paddingHorizontal: spacing.s4, paddingVertical: 0, marginBottom: spacing.s3 }}>
+          <DetailRow icon={UsersThreeIcon} label="Split with friends" sub="Share this expense · equal or custom" last chevron onPress={() => setSplitOpen(true)} />
         </Card>
 
         {/* Mini budget impact */}
-        <AppText weight="medium" style={{ fontSize: 11, color: colors.fg3, letterSpacing: 0.11, marginHorizontal: 4, marginBottom: spacing.s2 }}>
-          Impact on {cat.name} budget
-        </AppText>
-        <Card style={{ padding: spacing.s3 + 2, marginBottom: spacing.s3 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.s2 }}>
-            <AppText weight="semibold" style={{ fontSize: 12, color: colors.fg2 }}>
-              ₹3,200 of ₹5,000
+        {bucket ? (
+          <>
+            <AppText weight="medium" style={{ fontSize: 11, color: colors.fg3, letterSpacing: 0.11, marginHorizontal: 4, marginBottom: spacing.s2 }}>
+              Impact on {bucket.label} budget
             </AppText>
-            <AppText weight="semibold" style={{ fontSize: 12, color: colors.fg3 }}>
-              64%
-            </AppText>
-          </View>
-          <View style={{ height: 8, backgroundColor: colors.bgSurface, borderRadius: radii.pill, overflow: 'hidden' }}>
-            <View style={{ width: '64%', height: '100%', backgroundColor: cat.color, borderRadius: radii.pill }} />
-          </View>
-        </Card>
+            <Card style={{ padding: spacing.s3 + 2, marginBottom: spacing.s3 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.s2 }}>
+                <AppText weight="semibold" style={{ fontSize: 12, color: colors.fg2 }}>
+                  ₹{bucketSpent.toLocaleString('en-IN')} of ₹{bucketCap.toLocaleString('en-IN')}
+                </AppText>
+                <AppText weight="semibold" style={{ fontSize: 12, color: colors.fg3 }}>
+                  {bucketPct}%
+                </AppText>
+              </View>
+              <View style={{ height: 8, backgroundColor: colors.bgSurface, borderRadius: radii.pill, overflow: 'hidden' }}>
+                <View style={{ width: `${bucketPct}%`, height: '100%', backgroundColor: cat.color, borderRadius: radii.pill }} />
+              </View>
+            </Card>
+          </>
+        ) : null}
       </ScrollView>
 
       {/* 3-dot actions */}
@@ -402,6 +434,12 @@ function TxnDetailScreen({ route, navigation }: Props) {
           </Pressable>
         </View>
       </BottomSheet>
+
+      <SplitSheet
+        open={splitOpen}
+        onClose={() => setSplitOpen(false)}
+        txn={{ merchant, amount: Math.abs(t.amount), category: t.category, day }}
+      />
     </SafeAreaView>
   );
 }

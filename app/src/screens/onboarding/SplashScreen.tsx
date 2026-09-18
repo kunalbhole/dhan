@@ -37,11 +37,12 @@ function SplashScreen({ navigation }: Props) {
     ]).start();
 
     // Mirrors app.jsx's splash onDone: returning users (hasAccount()) go to
-    // Login, new users to Onboarding. LoginScreen isn't built yet, so a
-    // returning user is routed to Home for now — TODO: rewire to 'Login'
-    // once that screen exists.
+    // Login, new users to Restore (offering to bring back a Google Drive
+    // backup before Onboarding — see RestorePromptScreen). LoginScreen
+    // isn't built yet, so a returning user is routed to Home for now —
+    // TODO: rewire to 'Login' once that screen exists.
     const timer = setTimeout(() => {
-      hasAccount().then(known => navigation.replace(known ? 'Home' : 'Onboarding'));
+      hasAccount().then(known => navigation.replace(known ? 'Home' : 'Restore'));
     }, HOLD_MS);
     return () => clearTimeout(timer);
   }, [navigation, opacity, translateY]);

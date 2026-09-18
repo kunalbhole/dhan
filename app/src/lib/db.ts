@@ -176,6 +176,56 @@ export async function deleteTransaction(id: number): Promise<void> {
   notifyTransactionsChanged();
 }
 
+// Unbounded — for backup export only (src/lib/backupService.ts). Every
+// other reader deliberately takes a `limit` since screens only ever need a
+// bounded slice; a full dump is this function's one job.
+export async function getAllTransactions(): Promise<StoredTransaction[]> {
+  const database = await getDb();
+  const result = await database.execute('SELECT * FROM transactions ORDER BY timestamp DESC;');
+  return result.rows.map(rowToTransaction);
+}
+
+// For restore only (src/lib/backupService.ts), against a freshly onboarded,
+// empty local DB — never against a live user's existing data (see
+// RestorePromptScreen, gated on hasAccount() === false). `INSERT OR IGNORE`
+// keyed on dedup_key, same as insertTransaction, makes this idempotent
+// rather than because any real conflict is expected. Wrapped in one
+// transaction so a large backup restores as a single atomic write.
+export async function restoreTransactions(rows: StoredTransaction[]): Promise<number> {
+  const database = await getDb();
+  let inserted = 0;
+  await database.transaction(async tx => {
+    for (const row of rows) {
+      const result = await tx.execute(
+        `INSERT OR IGNORE INTO transactions
+           (dedup_key, sender, merchant, subtitle, body, amount, category,
+            is_foreign_transaction, original_currency, original_amount, inr_amount,
+            category_locked, timestamp, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        [
+          row.dedupKey,
+          row.sender,
+          row.merchant,
+          row.subtitle,
+          row.body,
+          row.amount,
+          row.category,
+          row.isForeignTransaction ? 1 : 0,
+          row.originalCurrency,
+          row.originalAmount,
+          row.inrAmount,
+          row.categoryLocked ? 1 : 0,
+          row.timestamp,
+          row.createdAt,
+        ],
+      );
+      if (result.rowsAffected) inserted += 1;
+    }
+  });
+  if (inserted) notifyTransactionsChanged();
+  return inserted;
+}
+
 // Lets any mounted screen react to a new transaction being stored (SMS
 // parsing happens at the app root in App.tsx, decoupled from whichever
 // screen is on top) without polling or a focus-based refetch.

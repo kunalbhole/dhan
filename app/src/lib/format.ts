@@ -31,6 +31,22 @@ function startOfDay(d: Date): number {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
 
+// "Just now" / "12m ago" / "3h ago" / "5d ago", falling back to the same
+// weekday/date shape as formatDay for anything older than a week — used
+// for BackupSettingsScreen's "Last backup: …" line, where an exact
+// timestamp matters less than a quick sense of how stale it is.
+export function formatRelativeTime(ms: number, now: Date = new Date()): string {
+  const diffMs = now.getTime() - ms;
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return formatDay(ms);
+}
+
 // Matches screens-main.jsx's SAMPLE_TXNS "day" field: "Today · Apr 23" for
 // today, bare "Yesterday" for yesterday, "Mon · Apr 21" for anything older
 // (weekday + date, no year — this app has no need to show transactions

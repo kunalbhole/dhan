@@ -2,6 +2,7 @@ import { ElementRef, useCallback, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, TextInputKeyPressEvent, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { getAuth, signInWithPhoneNumber, type ConfirmationResult } from '@react-native-firebase/auth';
 import AppText from '../../components/AppText';
 import Button from '../../components/Button';
 import Field from '../../components/Field';
@@ -14,6 +15,25 @@ type Props = NativeStackScreenProps<RootStackParamList, 'SignUp'>;
 
 const OTP_LENGTH = 4;
 
+// Firebase's own error.message is developer-facing ("An internal error has
+// occurred...[ APP_NOT_AUTHORIZED ]"); map the codes worth distinguishing
+// for a user to plain copy and fall back to one generic line for the rest.
+function authErrorMessage(err: unknown): string {
+  const code = err instanceof Error && 'code' in err ? String((err as { code: unknown }).code) : '';
+  switch (code) {
+    case 'auth/invalid-phone-number':
+      return "That doesn't look like a valid number.";
+    case 'auth/too-many-requests':
+      return 'Too many attempts — try again in a bit.';
+    case 'auth/invalid-verification-code':
+      return "That code isn't right. Check and try again.";
+    case 'auth/code-expired':
+      return 'That code expired — resend and try again.';
+    default:
+      return "Something went wrong. Check your connection and try again.";
+  }
+}
+
 function SignUpScreen({ navigation }: Props) {
   const [step, setStep] = useState<0 | 1>(0);
   const [name, setName] = useState('Priya Sharma');
@@ -22,7 +42,52 @@ function SignUpScreen({ navigation }: Props) {
   const otpRefs = useRef<Array<ElementRef<typeof TextInput> | null>>([]);
   const full = otp.every(d => d !== '');
 
+  const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null);
+  const [sending, setSending] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const goNext = useCallback(() => navigation.navigate('Permissions'), [navigation]);
+
+  const sendCode = useCallback(async () => {
+    setError(null);
+    setSending(true);
+    try {
+      const e164Phone = `+91${phone.replace(/\s/g, '')}`;
+      const result = await signInWithPhoneNumber(getAuth(), e164Phone);
+      setConfirmation(result);
+      setStep(1);
+    } catch (err) {
+      setError(authErrorMessage(err));
+    } finally {
+      setSending(false);
+    }
+  }, [phone]);
+
+  // Shared by the OTP step's back arrow and its "Edit" link — a stale
+  // confirmation object shouldn't be confirmed against a since-edited number.
+  const backToPhoneStep = useCallback(() => {
+    setConfirmation(null);
+    setError(null);
+    setOtp(Array(OTP_LENGTH).fill(''));
+    setStep(0);
+  }, []);
+
+  const confirmCode = useCallback(async () => {
+    if (!confirmation) return;
+    setError(null);
+    setConfirming(true);
+    try {
+      await confirmation.confirm(otp.join(''));
+      goNext();
+    } catch (err) {
+      setError(authErrorMessage(err));
+      setOtp(Array(OTP_LENGTH).fill(''));
+      otpRefs.current[0]?.focus();
+    } finally {
+      setConfirming(false);
+    }
+  }, [confirmation, otp, goNext]);
 
   const onOtpChange = (i: number, v: string) => {
     if (!/^\d?$/.test(v)) return;
@@ -44,8 +109,8 @@ function SignUpScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <ScreenHeader
-        title={step === 0 ? 'Create account' : 'Verify number'}
-        onBack={() => (step === 0 ? navigation.goBack() : setStep(0))}
+        title={step === 0 ? 'Your account' : 'Verify number'}
+        onBack={() => (step === 0 ? navigation.goBack() : backToPhoneStep())}
       />
       <View style={styles.body}>
         {step === 0 ? (
@@ -64,11 +129,16 @@ function SignUpScreen({ navigation }: Props) {
               keyboardType="phone-pad"
             />
             <View style={styles.spacer} />
+            {error && (
+              <AppText weight="medium" style={styles.errorText}>
+                {error}
+              </AppText>
+            )}
             <AppText style={styles.legal}>
               By continuing, you agree to Dhan&apos;s Terms of Service and Privacy Policy.
             </AppText>
-            <Button variant="primary" full size="lg" disabled={!name || !phone} onPress={() => setStep(1)}>
-              Continue
+            <Button variant="primary" full size="lg" disabled={!name || !phone || sending} onPress={sendCode}>
+              {sending ? 'Sending…' : 'Continue'}
             </Button>
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />
@@ -90,7 +160,7 @@ function SignUpScreen({ navigation }: Props) {
               <AppText style={styles.subtitle}>
                 Sent to <AppText weight="semibold" style={styles.sentPhone}>+91 {phone}</AppText>
               </AppText>
-              <Pressable onPress={() => setStep(0)} hitSlop={8}>
+              <Pressable onPress={backToPhoneStep} hitSlop={8}>
                 <AppText weight="semibold" style={styles.editLink}>
                   Edit
                 </AppText>
@@ -121,9 +191,14 @@ function SignUpScreen({ navigation }: Props) {
                 </AppText>
               </Pressable>
             </View>
+            {error && (
+              <AppText weight="medium" style={[styles.errorText, styles.otpError]}>
+                {error}
+              </AppText>
+            )}
             <View style={styles.spacer} />
-            <Button variant="primary" full size="lg" disabled={!full} onPress={goNext}>
-              Create account
+            <Button variant="primary" full size="lg" disabled={!full || confirming} onPress={confirmCode}>
+              {confirming ? 'Verifying…' : 'Your account'}
             </Button>
           </>
         )}
@@ -155,6 +230,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.fg2,
     marginBottom: spacing.s5,
+  },
+  errorText: {
+    fontSize: typography.scale.bodySm.fontSize,
+    color: colors.expense,
+    textAlign: 'center',
+    marginBottom: spacing.s3,
+  },
+  otpError: {
+    marginTop: spacing.s2,
+    marginBottom: 0,
   },
   spacer: {
     flex: 1,

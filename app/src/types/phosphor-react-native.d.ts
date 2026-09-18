@@ -339,3 +339,255 @@ declare module 'phosphor-react-native/lib/module/icons/Info' {
   export const Info: Icon;
   export const InfoIcon: Icon;
 }
+
+declare module 'phosphor-react-native/lib/module/icons/Translate' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Translate: Icon;
+  export const TranslateIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Globe' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Globe: Icon;
+  export const GlobeIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Moon' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Moon: Icon;
+  export const MoonIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/DownloadSimple' {
+  import type { Icon } from 'phosphor-react-native';
+  export const DownloadSimple: Icon;
+  export const DownloadSimpleIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/LockKey' {
+  import type { Icon } from 'phosphor-react-native';
+  export const LockKey: Icon;
+  export const LockKeyIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/SlidersHorizontal' {
+  import type { Icon } from 'phosphor-react-native';
+  export const SlidersHorizontal: Icon;
+  export const SlidersHorizontalIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/CloudArrowDown' {
+  import type { Icon } from 'phosphor-react-native';
+  export const CloudArrowDown: Icon;
+  export const CloudArrowDownIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/CloudArrowUp' {
+  import type { Icon } from 'phosphor-react-native';
+  export const CloudArrowUp: Icon;
+  export const CloudArrowUpIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/GoogleLogo' {
+  import type { Icon } from 'phosphor-react-native';
+  export const GoogleLogo: Icon;
+  export const GoogleLogoIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/UserCircle' {
+  import type { Icon } from 'phosphor-react-native';
+  export const UserCircle: Icon;
+  export const UserCircleIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Lifebuoy' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Lifebuoy: Icon;
+  export const LifebuoyIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/SignOut' {
+  import type { Icon } from 'phosphor-react-native';
+  export const SignOut: Icon;
+  export const SignOutIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/FileText' {
+  import type { Icon } from 'phosphor-react-native';
+  export const FileText: Icon;
+  export const FileTextIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Scroll' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Scroll: Icon;
+  export const ScrollIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Tag' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Tag: Icon;
+  export const TagIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Sparkle' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Sparkle: Icon;
+  export const SparkleIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/XCircle' {
+  import type { Icon } from 'phosphor-react-native';
+  export const XCircle: Icon;
+  export const XCircleIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/ClockCounterClockwise' {
+  import type { Icon } from 'phosphor-react-native';
+  export const ClockCounterClockwise: Icon;
+  export const ClockCounterClockwiseIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/ArrowUpLeft' {
+  import type { Icon } from 'phosphor-react-native';
+  export const ArrowUpLeft: Icon;
+  export const ArrowUpLeftIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/MagnifyingGlassMinus' {
+  import type { Icon } from 'phosphor-react-native';
+  export const MagnifyingGlassMinus: Icon;
+  export const MagnifyingGlassMinusIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Funnel' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Funnel: Icon;
+  export const FunnelIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/PiggyBank' {
+  import type { Icon } from 'phosphor-react-native';
+  export const PiggyBank: Icon;
+  export const PiggyBankIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/HouseLine' {
+  import type { Icon } from 'phosphor-react-native';
+  export const HouseLine: Icon;
+  export const HouseLineIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Confetti' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Confetti: Icon;
+  export const ConfettiIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/CaretLeft' {
+  import type { Icon } from 'phosphor-react-native';
+  export const CaretLeft: Icon;
+  export const CaretLeftIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/CaretDown' {
+  import type { Icon } from 'phosphor-react-native';
+  export const CaretDown: Icon;
+  export const CaretDownIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/DotsThreeVertical' {
+  import type { Icon } from 'phosphor-react-native';
+  export const DotsThreeVertical: Icon;
+  export const DotsThreeVerticalIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/PencilSimple' {
+  import type { Icon } from 'phosphor-react-native';
+  export const PencilSimple: Icon;
+  export const PencilSimpleIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/User' {
+  import type { Icon } from 'phosphor-react-native';
+  export const User: Icon;
+  export const UserIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/LockSimple' {
+  import type { Icon } from 'phosphor-react-native';
+  export const LockSimple: Icon;
+  export const LockSimpleIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Calendar' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Calendar: Icon;
+  export const CalendarIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Gift' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Gift: Icon;
+  export const GiftIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Handshake' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Handshake: Icon;
+  export const HandshakeIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/PaperPlaneTilt' {
+  import type { Icon } from 'phosphor-react-native';
+  export const PaperPlaneTilt: Icon;
+  export const PaperPlaneTiltIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/QrCode' {
+  import type { Icon } from 'phosphor-react-native';
+  export const QrCode: Icon;
+  export const QrCodeIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Money' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Money: Icon;
+  export const MoneyIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/UserPlus' {
+  import type { Icon } from 'phosphor-react-native';
+  export const UserPlus: Icon;
+  export const UserPlusIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Star' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Star: Icon;
+  export const StarIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Export' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Export: Icon;
+  export const ExportIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/FileCsv' {
+  import type { Icon } from 'phosphor-react-native';
+  export const FileCsv: Icon;
+  export const FileCsvIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/BellRinging' {
+  import type { Icon } from 'phosphor-react-native';
+  export const BellRinging: Icon;
+  export const BellRingingIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/CheckSquareOffset' {
+  import type { Icon } from 'phosphor-react-native';
+  export const CheckSquareOffset: Icon;
+  export const CheckSquareOffsetIcon: Icon;
+}

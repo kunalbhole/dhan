@@ -10,7 +10,7 @@ import SelectIndicator from '../../components/SelectIndicator';
 import { colors, radii, shadows, spacing, typography } from '../../theme';
 import { FRAMEWORKS, frameworkBuckets } from '../../lib/frameworks';
 import { CATEGORIES } from '../../lib/categories';
-import { setOnboarded } from '../../lib/account';
+import { setOnboarded, setFramework } from '../../lib/account';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Framework'>;
@@ -28,15 +28,15 @@ const BLURBS: Record<string, string> = {
 const OPTIONS = [...FRAMEWORKS, { id: 'custom', name: 'Custom', desc: 'Build your own mix' }];
 
 function FrameworkScreen({ navigation }: Props) {
-  // The reference persists the pick to localStorage; this app has no
-  // preferences-storage layer yet, so the choice only lives in this
-  // screen's state for now (defaults match the reference's default).
   const [sel, setSel] = useState('50-30-20');
 
   const choose = async () => {
-    // Mirrors app.jsx's framework onDone: localStorage.setItem("dhan-onboarded", "1")
-    // before landing on home, so a relaunch's Splash routes to Login instead
-    // of Onboarding.
+    // Mirrors app.jsx's framework onDone: localStorage.setItem("dhan-framework", id)
+    // and localStorage.setItem("dhan-onboarded", "1") before landing on
+    // home, so a relaunch's Splash routes to Login instead of Onboarding,
+    // and HomeScreen's budget math reads the framework the user actually
+    // picked instead of a hardcoded default.
+    await setFramework(sel);
     await setOnboarded();
     navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
   };
