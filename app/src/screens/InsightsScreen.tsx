@@ -9,13 +9,14 @@ import { SparkleIcon } from 'phosphor-react-native/lib/module/icons/Sparkle';
 import { LockSimpleIcon } from 'phosphor-react-native/lib/module/icons/LockSimple';
 import { CaretRightIcon } from 'phosphor-react-native/lib/module/icons/CaretRight';
 import AppText from '../components/AppText';
+import BottomSheet from '../components/BottomSheet';
 import Card from '../components/Card';
 import IconChip from '../components/IconChip';
 import ScreenHeader from '../components/ScreenHeader';
 import { colors, radii, shadows, spacing } from '../theme';
 import { CATEGORIES } from '../lib/categories';
 import { CATEGORY_ICONS } from '../lib/categoryIcons';
-import { computeInsightFeed, computeSummary, type InsightPeriodId, type InsightTone } from '../lib/insights';
+import { computeInsightFeed, computeSummary, type InsightCard, type InsightPeriodId, type InsightTone } from '../lib/insights';
 import { getRecentTransactions, subscribeToTransactionsChanged, type StoredTransaction } from '../lib/db';
 import { getBills, subscribeToBills } from '../lib/billsStore';
 import type { Bill } from '../lib/bills';
@@ -38,13 +39,19 @@ function InsightsScreen({ navigation }: Props) {
   const [period, setPeriod] = useState<InsightPeriodId>('week');
   const [txns, setTxns] = useState<StoredTransaction[]>([]);
   const [bills, setBills] = useState<Bill[]>(getBills());
+  const [selectedInsight, setSelectedInsight] = useState<InsightCard | null>(null);
 
   useEffect(() => {
-    const load = () => getRecentTransactions(2000).then(setTxns);
+    const load = () => {
+      getRecentTransactions(2000).then(setTxns);
+    };
     load();
     return subscribeToTransactionsChanged(load);
   }, []);
-  useEffect(() => subscribeToBills(() => setBills([...getBills()])), []);
+
+  useEffect(() => {
+    return subscribeToBills(() => setBills([...getBills()]));
+  }, []);
 
   const summary = useMemo(() => computeSummary(txns, period), [txns, period]);
   const feed = useMemo(() => computeInsightFeed(txns, bills), [txns, bills]);
@@ -52,10 +59,21 @@ function InsightsScreen({ navigation }: Props) {
   const topCat = summary.topCategory ? CATEGORIES[summary.topCategory] : null;
   const TopCatIcon = summary.topCategory ? CATEGORY_ICONS[summary.topCategory] : null;
 
-  const openTarget = (view: 'txn' | 'bills') => {
-    if (view === 'txn') navigation.navigate('Transactions');
-    else navigation.navigate('Bills');
-  };
+  const insightTxns = useMemo(() => {
+    if (!selectedInsight) return [];
+    const meta = selectedInsight.meta;
+    if (meta.type === 'cheapest-day' && meta.weekdayIndex !== undefined) {
+      return txns.filter(t => t.amount < 0 && new Date(t.timestamp).getDay() === meta.weekdayIndex);
+    }
+    if (meta.type === 'trend' && meta.categoryKey) {
+      return txns.filter(t => t.category === meta.categoryKey);
+    }
+    if (meta.type === 'steady' && meta.billName) {
+      const query = meta.billName.toLowerCase();
+      return txns.filter(t => (t.merchant && t.merchant.toLowerCase().includes(query)) || t.subtitle.toLowerCase().includes(query));
+    }
+    return txns.slice(0, 10);
+  }, [selectedInsight, txns]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bgSurface }} edges={['top', 'bottom']}>
@@ -98,13 +116,16 @@ function InsightsScreen({ navigation }: Props) {
 
           <View style={{ marginTop: spacing.s4, borderTopWidth: 1, borderTopColor: colors.borderSubtle }}>
             {topCat && TopCatIcon ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s4, paddingVertical: spacing.s4, borderBottomWidth: 1, borderBottomColor: colors.borderSubtle }}>
+              <Pressable
+                onPress={() => summary.topCategory && navigation.navigate('CategoryTxns', { category: summary.topCategory })}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s4, paddingVertical: spacing.s4, borderBottomWidth: 1, borderBottomColor: colors.borderSubtle }}
+              >
                 <IconChip icon={TopCatIcon} color={topCat.color} bg={`${topCat.color}1F`} />
                 <AppText style={{ flex: 1, fontSize: 14, color: colors.fg2 }}>Biggest category</AppText>
                 <AppText weight="semibold" style={{ fontSize: 14, color: colors.navy, fontVariant: ['tabular-nums'] }}>
                   {topCat.name} · ₹{summary.topAmount.toLocaleString('en-IN')}
                 </AppText>
-              </View>
+              </Pressable>
             ) : (
               <View style={{ paddingVertical: spacing.s4, borderBottomWidth: 1, borderBottomColor: colors.borderSubtle }}>
                 <AppText style={{ fontSize: 13, color: colors.fg3 }}>No spending {period === 'week' ? 'this week' : 'this month'} yet.</AppText>
@@ -132,7 +153,11 @@ function InsightsScreen({ navigation }: Props) {
           feed.map(n => {
             const tone = TONE_COLORS[n.tone];
             return (
-              <Card key={n.id} onPress={() => openTarget(n.target.view)} style={{ padding: spacing.s3 + 2, marginBottom: spacing.s2, flexDirection: 'row', alignItems: 'center', gap: spacing.s4 }}>
+              <Card
+                key={n.id}
+                onPress={() => setSelectedInsight(n)}
+                style={{ padding: spacing.s3 + 2, marginBottom: spacing.s2, flexDirection: 'row', alignItems: 'center', gap: spacing.s4 }}
+              >
                 <IconChip icon={n.icon} color={tone.fg} bg={tone.bg} fill />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <AppText weight="semibold" style={{ fontSize: 14, color: colors.navy, lineHeight: 18 }}>
@@ -146,42 +171,120 @@ function InsightsScreen({ navigation }: Props) {
           })
         )}
 
-        <Card style={{ padding: spacing.s3 + 2, marginTop: spacing.s2, flexDirection: 'row', alignItems: 'center', gap: spacing.s4, opacity: 0.9 }}>
-          <View>
-            <View style={{ opacity: 0.5 }}>
-              <IconChip icon={SparkleIcon} color={colors.gold} bg={colors.goldBg} fill />
+        <Pressable onPress={() => navigation.navigate('PlusPaywall', { note: 'Unlock AI-powered behavioral analytics with Dhan Plus' })}>
+          <Card style={{ padding: spacing.s3 + 2, marginTop: spacing.s2, flexDirection: 'row', alignItems: 'center', gap: spacing.s4, opacity: 0.9 }}>
+            <View>
+              <View style={{ opacity: 0.5 }}>
+                <IconChip icon={SparkleIcon} color={colors.gold} bg={colors.goldBg} fill />
+              </View>
+              <View
+                style={{
+                  position: 'absolute',
+                  top: -6,
+                  right: -6,
+                  width: 18,
+                  height: 18,
+                  borderRadius: radii.pill,
+                  backgroundColor: colors.navy,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <LockSimpleIcon size={9} color={colors.fgOnDark} weight="fill" />
+              </View>
             </View>
-            <View
-              style={{
-                position: 'absolute',
-                top: -6,
-                right: -6,
-                width: 18,
-                height: 18,
-                borderRadius: radii.pill,
-                backgroundColor: colors.navy,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <LockSimpleIcon size={9} color={colors.fgOnDark} weight="fill" />
+            <View style={{ flex: 1, minWidth: 0, opacity: 0.5 }}>
+              <AppText weight="semibold" style={{ fontSize: 14, color: colors.navy }}>
+                AI-powered insights
+              </AppText>
+              <AppText style={{ fontSize: 12.5, color: colors.fg3, marginTop: 2, lineHeight: 17 }}>
+                Deeper trend breakdowns and personalized tips — included with Dhan Plus
+              </AppText>
             </View>
-          </View>
-          <View style={{ flex: 1, minWidth: 0, opacity: 0.5 }}>
-            <AppText weight="semibold" style={{ fontSize: 14, color: colors.navy }}>
-              AI-powered insights
-            </AppText>
-            <AppText style={{ fontSize: 12.5, color: colors.fg3, marginTop: 2, lineHeight: 17 }}>
-              Deeper trend breakdowns and personalized tips — included with Dhan Plus
-            </AppText>
-          </View>
-          <View style={{ backgroundColor: colors.gold, paddingVertical: 7, paddingHorizontal: 14, borderRadius: radii.pill }}>
-            <AppText weight="bold" style={{ fontSize: 11.5, color: colors.fgOnGold }}>
-              Upgrade
-            </AppText>
-          </View>
-        </Card>
+            <View style={{ backgroundColor: colors.gold, paddingVertical: 7, paddingHorizontal: 14, borderRadius: radii.pill }}>
+              <AppText weight="bold" style={{ fontSize: 11.5, color: colors.fgOnGold }}>
+                Upgrade
+              </AppText>
+            </View>
+          </Card>
+        </Pressable>
       </ScrollView>
+
+      {/* Insight Breakdown Sheet */}
+      <BottomSheet open={!!selectedInsight} onClose={() => setSelectedInsight(null)} title={selectedInsight?.title ?? 'Insight Breakdown'}>
+        <View style={{ gap: spacing.s3, paddingBottom: spacing.s4 }}>
+          <AppText style={{ fontSize: 13, color: colors.fg2, lineHeight: 19 }}>
+            {selectedInsight?.body}
+          </AppText>
+
+          {selectedInsight?.meta.type === 'cheapest-day' ? (
+            <Card style={{ padding: spacing.s3, backgroundColor: colors.bgSurface }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.s2 }}>
+                <View>
+                  <AppText style={{ fontSize: 11, color: colors.fg3 }}>{selectedInsight.meta.weekdayName}s Avg</AppText>
+                  <AppText weight="bold" style={{ fontSize: 18, color: colors.income, marginTop: 2 }}>
+                    ₹{selectedInsight.meta.avgSpend?.toLocaleString('en-IN')}
+                  </AppText>
+                </View>
+                <View>
+                  <AppText style={{ fontSize: 11, color: colors.fg3 }}>Other Days Avg</AppText>
+                  <AppText weight="bold" style={{ fontSize: 18, color: colors.navy, marginTop: 2 }}>
+                    ₹{selectedInsight.meta.otherAvgSpend?.toLocaleString('en-IN')}
+                  </AppText>
+                </View>
+              </View>
+              <AppText style={{ fontSize: 11.5, color: colors.fg3, marginTop: 4 }}>
+                Based on your transaction history over the last 60 days.
+              </AppText>
+            </Card>
+          ) : null}
+
+          {/* Filtered Transactions Header */}
+          <AppText weight="semibold" style={{ fontSize: 13, color: colors.fg1, marginTop: spacing.s2 }}>
+            {selectedInsight?.meta.type === 'cheapest-day'
+              ? `Transactions on ${selectedInsight.meta.weekdayName}s`
+              : selectedInsight?.meta.type === 'trend'
+                ? 'Category Transactions'
+                : 'Related Transactions'}
+          </AppText>
+
+          {insightTxns.length === 0 ? (
+            <AppText style={{ fontSize: 12, color: colors.fg3, paddingVertical: 12 }}>
+              No individual transactions match this filter.
+            </AppText>
+          ) : (
+            insightTxns.map(t => (
+              <Pressable
+                key={t.id}
+                onPress={() => {
+                  setSelectedInsight(null);
+                  navigation.navigate('TxnDetail', { transaction: t });
+                }}
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingVertical: 10,
+                  borderBottomWidth: 1,
+                  borderBottomColor: colors.borderSubtle,
+                }}
+              >
+                <View>
+                  <AppText weight="semibold" style={{ fontSize: 13.5, color: colors.fg1 }}>
+                    {t.merchant || 'Transaction'}
+                  </AppText>
+                  <AppText style={{ fontSize: 11.5, color: colors.fg3, marginTop: 2 }}>
+                    {new Date(t.timestamp).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+                  </AppText>
+                </View>
+                <AppText weight="bold" style={{ fontSize: 14, color: colors.fg1 }}>
+                  ₹{Math.abs(t.amount).toLocaleString('en-IN')}
+                </AppText>
+              </Pressable>
+            ))
+          )}
+        </View>
+      </BottomSheet>
     </SafeAreaView>
   );
 }

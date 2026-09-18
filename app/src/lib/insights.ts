@@ -1,8 +1,3 @@
-// Real spend-pattern math for InsightsScreen/InsightsTeaser — no sample
-// data. Ported from insights.jsx's INSIGHT_PERIODS (the summary card's
-// week/month toggle) and INSIGHT_FEED (the insight cards below it), but
-// every number here is computed from real StoredTransaction rows instead
-// of the reference's hardcoded figures.
 import type { ComponentType } from 'react';
 import { TrendUpIcon } from 'phosphor-react-native/lib/module/icons/TrendUp';
 import { CalendarCheckIcon } from 'phosphor-react-native/lib/module/icons/CalendarCheck';
@@ -14,7 +9,6 @@ import type { StoredTransaction } from './db';
 import type { PhosphorIconProps } from '../components/IconChip';
 
 const DAY = 86400000;
-// Same split TransactionsScreen's Overview grid uses for "Total savings".
 const SAVE_CATS = ['invest', 'edu'];
 
 export type InsightPeriodId = 'week' | 'month';
@@ -23,10 +17,10 @@ export interface InsightSummary {
   label: string;
   rangeLabel: string;
   spent: number;
-  deltaPct: number; // negative = down vs. the prior comparable period
+  deltaPct: number;
   topCategory: string | null;
   topAmount: number;
-  savingsRate: number; // 0-100, income this period that went to SAVE_CATS
+  savingsRate: number;
 }
 
 function sumExpense(txns: StoredTransaction[], from: number, to: number): number {
@@ -92,6 +86,17 @@ export function computeSummary(txns: StoredTransaction[], period: InsightPeriodI
 export type InsightTone = 'warn' | 'good' | 'info';
 export type InsightTarget = { view: 'txn' } | { view: 'bills' };
 
+export interface InsightMeta {
+  type: 'cheapest-day' | 'trend' | 'steady';
+  weekdayIndex?: number;
+  weekdayName?: string;
+  categoryKey?: string;
+  billName?: string;
+  avgSpend?: number;
+  otherAvgSpend?: number;
+  pctLess?: number;
+}
+
 export interface InsightCard {
   id: string;
   tone: InsightTone;
@@ -99,14 +104,11 @@ export interface InsightCard {
   title: string;
   body: string;
   target: InsightTarget;
+  meta: InsightMeta;
 }
 
-const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-// Category spend this month vs. last month — only surfaced when last
-// month actually had meaningful spend in that category (₹500+) and the
-// increase clears 15%, so a category going from ₹10 to ₹50 doesn't read
-// as a dramatic trend.
 function categoryTrendCard(txns: StoredTransaction[], now: Date): InsightCard | null {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
   const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
@@ -141,12 +143,15 @@ function categoryTrendCard(txns: StoredTransaction[], now: Date): InsightCard | 
     title: `${catName} up ${best.pct}% this month`,
     body: `₹${best.now.toLocaleString('en-IN')} so far, up from ₹${best.prev.toLocaleString('en-IN')} last month.`,
     target: { view: 'txn' },
+    meta: {
+      type: 'trend',
+      categoryKey: best.cat,
+      avgSpend: best.now,
+      otherAvgSpend: best.prev,
+    },
   };
 }
 
-// Average expense per weekday over the last 60 days — the day with the
-// lowest average, shown only once at least two different weekdays have
-// data to compare (otherwise "cheapest" is meaningless).
 function cheapestWeekdayCard(txns: StoredTransaction[], now: Date): InsightCard | null {
   const cutoff = now.getTime() - 60 * DAY;
   const totals = new Array(7).fill(0);
@@ -181,13 +186,17 @@ function cheapestWeekdayCard(txns: StoredTransaction[], now: Date): InsightCard 
     title: `${WEEKDAYS[cheapestDay]}s are your cheapest day`,
     body: `You spend ${pctLess}% less than your other days on average.`,
     target: { view: 'txn' },
+    meta: {
+      type: 'cheapest-day',
+      weekdayIndex: cheapestDay,
+      weekdayName: WEEKDAYS[cheapestDay],
+      avgSpend: Math.round(cheapestAvg),
+      otherAvgSpend: Math.round(overallAvg),
+      pctLess,
+    },
   };
 }
 
-// Ties into real detected/confirmed bills (billsStore.ts) — the steadiest
-// real recurring cost is whichever tracked bill has the most backfilled
-// occurrences, matching the reference's "Bills are your steadiest cost"
-// card but pointing at an actual bill instead of a fixed ₹4,299 figure.
 function steadiestBillCard(bills: Bill[]): InsightCard | null {
   const withHistory = bills.filter(b => b.status !== 'suggested' && b.status !== 'dismissed' && (b.occurrences?.length ?? 0) >= 2);
   if (!withHistory.length) return null;
@@ -200,12 +209,13 @@ function steadiestBillCard(bills: Bill[]): InsightCard | null {
     title: `${steadiest.name} is your steadiest cost`,
     body: `₹${steadiest.amt.toLocaleString('en-IN')} roughly every month for the last ${months} month${months === 1 ? '' : 's'}.`,
     target: { view: 'bills' },
+    meta: {
+      type: 'steady',
+      billName: steadiest.name,
+    },
   };
 }
 
-// Never fabricates a card for a pattern the data doesn't support — a
-// fresh install or thin history can legitimately return an empty list,
-// same principle as billDetection.ts only ever surfacing real matches.
 export function computeInsightFeed(txns: StoredTransaction[], bills: Bill[], now: Date = new Date()): InsightCard[] {
   return [categoryTrendCard(txns, now), cheapestWeekdayCard(txns, now), steadiestBillCard(bills)].filter((c): c is InsightCard => c !== null);
 }
