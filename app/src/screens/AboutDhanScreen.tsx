@@ -18,12 +18,8 @@ const BLOCKS: [string, string][] = [
     "Most money apps sell insight back to you or sell you to someone else. Dhan is built to be boring about privacy and opinionated about budgeting frameworks — 50/30/20 by default, five more if that doesn't fit.",
   ],
   [
-    'Company',
-    'Dhan Technologies Pvt. Ltd.\n4th Floor, Koramangala 5th Block\nBengaluru 560095, Karnataka, India\nCIN U62099KA2024PTC112233',
-  ],
-  [
     'Version',
-    '2.4.1 (build 2410) · September 2026\nMade with ♥ in Bengaluru',
+    '2.4.1 (build 2410) · September 2026',
   ],
 ];
 
