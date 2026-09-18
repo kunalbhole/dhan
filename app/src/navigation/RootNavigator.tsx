@@ -15,6 +15,22 @@ import FriendDetailScreen from '../screens/FriendDetailScreen';
 import GroupDetailScreen from '../screens/GroupDetailScreen';
 import GoalsScreen from '../screens/GoalsScreen';
 import InsightsScreen from '../screens/InsightsScreen';
+import ProfileScreen from '../screens/ProfileScreen';
+import AppLockScreen from '../screens/AppLockScreen';
+import SmsSourcesScreen from '../screens/SmsSourcesScreen';
+import NotifSettingsScreen from '../screens/NotifSettingsScreen';
+import CurrencyConverterScreen from '../screens/CurrencyConverterScreen';
+import LanguageScreen from '../screens/LanguageScreen';
+import CurrencyScreen from '../screens/CurrencyScreen';
+import AppearanceScreen from '../screens/AppearanceScreen';
+import ExportDataScreen from '../screens/ExportDataScreen';
+import PrivacySettingsScreen from '../screens/PrivacySettingsScreen';
+import LinkedAccountsScreen from '../screens/LinkedAccountsScreen';
+import HelpSupportScreen from '../screens/HelpSupportScreen';
+import AboutDhanScreen from '../screens/AboutDhanScreen';
+import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
+import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
+import ContactSupportScreen from '../screens/ContactSupportScreen';
 import type { Bill } from '../lib/bills';
 import SplashScreen from '../screens/onboarding/SplashScreen';
 import RestorePromptScreen from '../screens/onboarding/RestorePromptScreen';
@@ -76,6 +92,44 @@ export type RootStackParamList = {
   // Reached from Home's insights teaser and Settings' "Insights" row
   // (insights.jsx's InsightsScreen).
   Insights: undefined;
+  // Reached from Settings' own identity card and its "Profile" row
+  // (screens-extra-detail.jsx's ProfileEditScreen).
+  Profile: undefined;
+  // Reached from Settings' "App lock" row (settings-sub.jsx's
+  // AppLockScreen).
+  AppLock: undefined;
+  // Reached from Settings' "SMS sources" row (settings-sub.jsx's
+  // SmsSourcesScreen).
+  SmsSources: undefined;
+  // Reached from Settings' "Notifications" row (settings-sub.jsx's
+  // NotifSettingsScreen) — distinct from the bell-icon "Notifications"
+  // inbox route above, matching the reference's own two separate screens.
+  NotifSettings: undefined;
+  // Reached from Settings' "Currency converter" row
+  // (currency-converter.jsx's CurrencyConverterScreen).
+  CurrencyConverter: undefined;
+  // Reached from Settings' "Language" row (settings-sub.jsx's
+  // LanguageScreen).
+  Language: undefined;
+  // Reached from Settings' "Currency" row (settings-sub.jsx's
+  // CurrencyScreen) — the base-currency preference, distinct from the
+  // CurrencyConverter route above.
+  Currency: undefined;
+  // Reached from Settings' "Appearance" row (settings-sub.jsx's
+  // AppearanceScreen).
+  Appearance: undefined;
+  // Reached from Settings' "Export data" row (settings-sub.jsx's
+  // ExportDataScreen).
+  ExportData: undefined;
+  // Reached from Settings' "Privacy settings" row (settings-sub.jsx's
+  // PrivacySettingsScreen).
+  PrivacySettings: undefined;
+  LinkedAccounts: undefined;
+  HelpSupport: undefined;
+  AboutDhan: undefined;
+  TermsOfService: undefined;
+  PrivacyPolicy: undefined;
+  ContactSupport: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -107,6 +161,22 @@ function RootNavigator() {
         <Stack.Screen name="GroupDetail" component={GroupDetailScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Goals" component={GoalsScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Insights" component={InsightsScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="Profile" component={ProfileScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="AppLock" component={AppLockScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="SmsSources" component={SmsSourcesScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="NotifSettings" component={NotifSettingsScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="CurrencyConverter" component={CurrencyConverterScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="Language" component={LanguageScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="Currency" component={CurrencyScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="Appearance" component={AppearanceScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="ExportData" component={ExportDataScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="PrivacySettings" component={PrivacySettingsScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="LinkedAccounts" component={LinkedAccountsScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="HelpSupport" component={HelpSupportScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="AboutDhan" component={AboutDhanScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="ContactSupport" component={ContactSupportScreen} options={{ animation: 'slide_from_right' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

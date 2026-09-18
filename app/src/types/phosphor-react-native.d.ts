@@ -40,6 +40,18 @@ declare module 'phosphor-react-native/lib/module/icons/ChatCenteredText' {
   export const ChatCenteredTextIcon: Icon;
 }
 
+declare module 'phosphor-react-native/lib/module/icons/Chats' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Chats: Icon;
+  export const ChatsIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Envelope' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Envelope: Icon;
+  export const EnvelopeIcon: Icon;
+}
+
 declare module 'phosphor-react-native/lib/module/icons/Bell' {
   import type { Icon } from 'phosphor-react-native';
   export const Bell: Icon;
@@ -80,6 +92,108 @@ declare module 'phosphor-react-native/lib/module/icons/Car' {
   import type { Icon } from 'phosphor-react-native';
   export const Car: Icon;
   export const CarIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Key' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Key: Icon;
+  export const KeyIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Camera' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Camera: Icon;
+  export const CameraIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/ScanSmiley' {
+  import type { Icon } from 'phosphor-react-native';
+  export const ScanSmiley: Icon;
+  export const ScanSmileyIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Password' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Password: Icon;
+  export const PasswordIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Warning' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Warning: Icon;
+  export const WarningIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Megaphone' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Megaphone: Icon;
+  export const MegaphoneIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/WifiSlash' {
+  import type { Icon } from 'phosphor-react-native';
+  export const WifiSlash: Icon;
+  export const WifiSlashIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/ArrowsDownUp' {
+  import type { Icon } from 'phosphor-react-native';
+  export const ArrowsDownUp: Icon;
+  export const ArrowsDownUpIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/CurrencyInr' {
+  import type { Icon } from 'phosphor-react-native';
+  export const CurrencyInr: Icon;
+  export const CurrencyInrIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/CurrencyDollar' {
+  import type { Icon } from 'phosphor-react-native';
+  export const CurrencyDollar: Icon;
+  export const CurrencyDollarIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/CurrencyGbp' {
+  import type { Icon } from 'phosphor-react-native';
+  export const CurrencyGbp: Icon;
+  export const CurrencyGbpIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/CircleHalf' {
+  import type { Icon } from 'phosphor-react-native';
+  export const CircleHalf: Icon;
+  export const CircleHalfIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Sun' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Sun: Icon;
+  export const SunIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/FilePdf' {
+  import type { Icon } from 'phosphor-react-native';
+  export const FilePdf: Icon;
+  export const FilePdfIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/ChartBar' {
+  import type { Icon } from 'phosphor-react-native';
+  export const ChartBar: Icon;
+  export const ChartBarIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Fingerprint' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Fingerprint: Icon;
+  export const FingerprintIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/DeviceMobile' {
+  import type { Icon } from 'phosphor-react-native';
+  export const DeviceMobile: Icon;
+  export const DeviceMobileIcon: Icon;
 }
 
 declare module 'phosphor-react-native/lib/module/icons/ArrowDownLeft' {

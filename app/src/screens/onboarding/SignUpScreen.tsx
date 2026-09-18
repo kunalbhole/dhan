@@ -9,6 +9,7 @@ import Field from '../../components/Field';
 import ScreenHeader from '../../components/ScreenHeader';
 import GoogleIcon from '../../assets/GoogleIcon';
 import { colors, radii, spacing, typography } from '../../theme';
+import { setProfileNameIfEmpty } from '../../lib/profileStore';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SignUp'>;
@@ -79,6 +80,10 @@ function SignUpScreen({ navigation }: Props) {
     setConfirming(true);
     try {
       await confirmation.confirm(otp.join(''));
+      // The one field this app's onboarding actually collects for real —
+      // ProfileScreen reads it back via profileStore instead of a
+      // hardcoded "Priya Sharma".
+      await setProfileNameIfEmpty(name.trim());
       goNext();
     } catch (err) {
       setError(authErrorMessage(err));
@@ -87,7 +92,7 @@ function SignUpScreen({ navigation }: Props) {
     } finally {
       setConfirming(false);
     }
-  }, [confirmation, otp, goNext]);
+  }, [confirmation, otp, goNext, name]);
 
   const onOtpChange = (i: number, v: string) => {
     if (!/^\d?$/.test(v)) return;

@@ -1,4 +1,4 @@
-import { useState, type ComponentType } from 'react';
+import { useEffect, useState, type ComponentType } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -34,23 +34,29 @@ import TabBar, { type TabId } from '../components/TabBar';
 import DhanMark from '../assets/DhanMark';
 import { colors, radii, spacing } from '../theme';
 import { clearOnboarded, clearUserPrefs } from '../lib/account';
+import { getProfile, subscribeToProfile } from '../lib/profileStore';
+import { getAppLockSettings, subscribeToAppLock } from '../lib/appLockStore';
+import { getAllTransactions, subscribeToTransactionsChanged } from '../lib/db';
+import { getNotificationPrefs, subscribeToNotificationPrefs } from '../lib/notificationsStore';
+import { getLanguage, subscribeToLanguage, type LanguageId } from '../lib/languageStore';
+import { getIsPlus, setIsPlus, subscribeToPlan } from '../lib/planStore';
+import { getActiveCurrencies, subscribeToCurrencyPrefs, type CurrencyCode } from '../lib/currencyPrefStore';
+import { getAppearance, subscribeToAppearance } from '../lib/appearanceStore';
+import { getLinkedAccounts, subscribeLinkedAccounts } from '../lib/linkedAccountsStore';
 import type { PhosphorIconProps } from '../components/IconChip';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
-const USER_NAME = 'Priya';
-
 // Reference-hardcoded defaults (screens-settings.jsx's `prefs = {}` fallback
 // values) — this app has no preferences-storage layer yet, same status as
-// HomeScreen's hardcoded balance/budget figures.
-const PREFS = {
-  language: 'English',
-  currency: '₹ INR',
-  appearance: 'System',
-  notifCount: 3,
-  appLock: 'Face ID',
-};
+// HomeScreen's hardcoded balance/budget figures. App lock, SMS sources,
+// Notifications and Language are the exceptions — their row values are
+// computed live from their own stores below.
+const LANGUAGE_LABELS: Record<LanguageId, string> = { en: 'English', hi: 'हिंदी', mr: 'मराठी', ta: 'தமிழ்' };
+// No Arabic glyph for AED — see CurrencyScreen.tsx's own comment on why
+// (Poppins has no Arabic coverage, so it'd render as broken letterforms).
+const CURRENCY_SYMBOLS: Record<CurrencyCode, string> = { INR: '₹', USD: '$', AED: '', GBP: '£' };
 
 interface SettingsItem {
   icon: ComponentType<PhosphorIconProps>;
@@ -79,20 +85,20 @@ const SECTIONS: SettingsSection[] = [
   {
     title: 'Preferences',
     items: [
-      { icon: TranslateIcon, label: 'Language', value: PREFS.language, go: 'language' },
-      { icon: GlobeIcon, label: 'Currency', value: PREFS.currency, go: 'currency' },
-      { icon: MoonIcon, label: 'Appearance', value: PREFS.appearance, go: 'appearance' },
-      { icon: BellIcon, label: 'Notifications', value: `${PREFS.notifCount} on`, go: 'notif-settings' },
+      { icon: TranslateIcon, label: 'Language', go: 'language' },
+      { icon: GlobeIcon, label: 'Currency', go: 'currency' },
+      { icon: MoonIcon, label: 'Appearance', go: 'appearance' },
+      { icon: BellIcon, label: 'Notifications', go: 'notif-settings' },
     ],
   },
   {
     title: 'Data & privacy',
     items: [
-      { icon: ChatCenteredTextIcon, label: 'SMS sources', value: '3 banks', go: 'sms-sources' },
+      { icon: ChatCenteredTextIcon, label: 'SMS sources', go: 'sms-sources' },
       { icon: CloudArrowUpIcon, label: 'Backup & restore', action: 'backup' },
       { icon: DownloadSimpleIcon, label: 'Export data', go: 'export' },
       { icon: LockKeyIcon, label: 'Privacy settings', go: 'privacy-settings' },
-      { icon: ShieldCheckIcon, label: 'App lock', value: PREFS.appLock, go: 'app-lock' },
+      { icon: ShieldCheckIcon, label: 'App lock', go: 'app-lock' },
     ],
   },
   {
@@ -126,8 +132,43 @@ const stubNav = (dest: string) => {
 };
 
 function SettingsScreen({ navigation }: Props) {
-  const [isPlus, setIsPlus] = useState(false);
+  const [isPlus, setIsPlusState] = useState(getIsPlus());
   const [signOutOpen, setSignOutOpen] = useState(false);
+  const [profile, setProfile] = useState(getProfile());
+  const [appLock, setAppLock] = useState(getAppLockSettings());
+  const [senderCount, setSenderCount] = useState(0);
+  const [notifPrefs, setNotifPrefs] = useState(getNotificationPrefs());
+  const [language, setLanguageState] = useState(getLanguage());
+  const [activeCurrencies, setActiveCurrencies] = useState(getActiveCurrencies());
+  const [appearance, setAppearanceState] = useState(getAppearance());
+  const [linkedAccounts, setLinkedAccountsState] = useState(getLinkedAccounts());
+
+  useEffect(() => subscribeToProfile(() => setProfile(getProfile())), []);
+  useEffect(() => subscribeToAppLock(() => setAppLock({ ...getAppLockSettings() })), []);
+  useEffect(() => subscribeToPlan(() => setIsPlusState(getIsPlus())), []);
+  useEffect(() => subscribeToCurrencyPrefs(() => setActiveCurrencies(new Set(getActiveCurrencies()))), []);
+  useEffect(() => subscribeToAppearance(() => setAppearanceState(getAppearance())), []);
+  useEffect(() => subscribeToNotificationPrefs(() => setNotifPrefs({ ...getNotificationPrefs() })), []);
+  useEffect(() => subscribeToLanguage(() => setLanguageState(getLanguage())), []);
+  useEffect(() => subscribeLinkedAccounts(() => setLinkedAccountsState([...getLinkedAccounts()])), []);
+
+  useEffect(() => {
+    const load = () => {
+      getAllTransactions().then(txns => {
+        setSenderCount(new Set(txns.filter(t => t.sender).map(t => t.sender)).size);
+      });
+    };
+    load();
+    return subscribeToTransactionsChanged(load);
+  }, []);
+
+  const appLockValue = appLock.enabled ? (appLock.method === 'faceid' ? 'Face ID' : 'PIN') : 'None';
+  const smsSourcesValue = senderCount === 0 ? 'None yet' : `${senderCount} source${senderCount === 1 ? '' : 's'}`;
+  const notifOnCount = Object.values(notifPrefs).filter(Boolean).length;
+  const notifValue = `${notifOnCount} on`;
+  const languageValue = LANGUAGE_LABELS[language];
+  const currencyList = [...activeCurrencies];
+  const currencyValue = currencyList.length > 1 ? `${currencyList.length} active` : `${CURRENCY_SYMBOLS[currencyList[0]]} ${currencyList[0]}`.trim();
 
   const handleSignOut = async () => {
     setSignOutOpen(false);
@@ -164,17 +205,19 @@ function SettingsScreen({ navigation }: Props) {
           </Pressable>
         </View>
 
-        {/* Identity */}
-        <Card onPress={() => stubNav('profile')} style={{ padding: spacing.s4, marginBottom: spacing.s4 }}>
+        {/* Identity — real name from profileStore.ts (set at sign-up,
+            editable on ProfileScreen) rather than a hardcoded "Priya
+            Sharma"; falls back to a generic placeholder until it's set. */}
+        <Card onPress={() => navigation.navigate('Profile')} style={{ padding: spacing.s4, marginBottom: spacing.s4 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
             <View style={{ width: 48, height: 48, borderRadius: radii.pill, backgroundColor: colors.gold, alignItems: 'center', justifyContent: 'center' }}>
               <AppText weight="bold" style={{ fontSize: 18, color: colors.navy }}>
-                {USER_NAME[0]}
+                {profile.name.trim()[0]?.toUpperCase() ?? '?'}
               </AppText>
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
               <AppText weight="semibold" style={{ fontSize: 15, color: colors.navy }}>
-                {USER_NAME} Sharma
+                {profile.name || 'Add your name'}
               </AppText>
               <AppText style={{ fontSize: 12, color: colors.fg3, marginTop: 2 }}>{isPlus ? 'Dhan Plus member' : 'Free plan'}</AppText>
             </View>
@@ -234,11 +277,40 @@ function SettingsScreen({ navigation }: Props) {
                           else if (item.action === 'backup') navigation.navigate('BackupSettings');
                           else if (item.go === 'goals') navigation.navigate('Goals');
                           else if (item.go === 'insights') navigation.navigate('Insights');
+                          else if (item.go === 'profile') navigation.navigate('Profile');
+                          else if (item.go === 'app-lock') navigation.navigate('AppLock');
+                          else if (item.go === 'sms-sources') navigation.navigate('SmsSources');
+                          else if (item.go === 'notif-settings') navigation.navigate('NotifSettings');
+                          else if (item.go === 'converter') navigation.navigate('CurrencyConverter');
+                          else if (item.go === 'language') navigation.navigate('Language');
+                          else if (item.go === 'currency') navigation.navigate('Currency');
+                          else if (item.go === 'appearance') navigation.navigate('Appearance');
+                          else if (item.go === 'export') navigation.navigate('ExportData');
+                          else if (item.go === 'privacy-settings') navigation.navigate('PrivacySettings');
+                          else if (item.go === 'linked') navigation.navigate('LinkedAccounts');
+                          else if (item.go === 'help') navigation.navigate('HelpSupport');
+                          else if (item.go === 'about') navigation.navigate('AboutDhan');
+                          else if (item.go === 'terms') navigation.navigate('TermsOfService');
+                          else if (item.go === 'privacy-policy') navigation.navigate('PrivacyPolicy');
                           else stubNav(item.go ?? '');
                         }
                   }
                 >
-                  {item.value ?? ''}
+                  {item.go === 'app-lock'
+                    ? appLockValue
+                    : item.go === 'sms-sources'
+                      ? smsSourcesValue
+                      : item.go === 'notif-settings'
+                        ? notifValue
+                        : item.go === 'language'
+                          ? languageValue
+                          : item.go === 'currency'
+                            ? currencyValue
+                            : item.go === 'appearance'
+                              ? appearance
+                              : item.go === 'linked'
+                                ? `${linkedAccounts.length} linked`
+                                : (item.value ?? '')}
                 </DetailRow>
               ))}
             </Card>

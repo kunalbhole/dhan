@@ -14,6 +14,7 @@ export interface FieldProps {
   autoFocus?: boolean;
   editable?: boolean;
   right?: ReactNode;
+  onBlur?: () => void;
 }
 
 function Field({
@@ -26,6 +27,7 @@ function Field({
   autoFocus,
   editable,
   right,
+  onBlur,
 }: FieldProps) {
   const [focused, setFocused] = useState(false);
 
@@ -46,7 +48,10 @@ function Field({
           value={value}
           onChangeText={onChangeText}
           onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
+          onBlur={() => {
+            setFocused(false);
+            onBlur?.();
+          }}
           placeholder={placeholder}
           placeholderTextColor={colors.fg3}
           keyboardType={keyboardType}
