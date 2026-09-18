@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Image, Pressable, ScrollView, View } from 'react-native';
+import { Image, NativeModules, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { getAuth } from '@react-native-firebase/auth';
@@ -10,6 +10,7 @@ import { CheckCircleIcon } from 'phosphor-react-native/lib/module/icons/CheckCir
 import { GoogleLogoIcon } from 'phosphor-react-native/lib/module/icons/GoogleLogo';
 import { ImageIcon } from 'phosphor-react-native/lib/module/icons/Image';
 import { KeyIcon } from 'phosphor-react-native/lib/module/icons/Key';
+import { LinkIcon } from 'phosphor-react-native/lib/module/icons/Link';
 import { ShieldCheckIcon } from 'phosphor-react-native/lib/module/icons/ShieldCheck';
 import { TrashIcon } from 'phosphor-react-native/lib/module/icons/Trash';
 import AppText from '../components/AppText';
@@ -29,6 +30,12 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
 
 const DEFAULT_GOOGLE_AVATAR = 'https://lh3.googleusercontent.com/a/default-user=s120-p';
 
+const SAMPLE_PHOTOS = [
+  { name: 'Portrait 1', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80' },
+  { name: 'Portrait 2', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80' },
+  { name: 'Portrait 3', url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop&q=80' },
+];
+
 const stubNav = (dest: string) => {
   // eslint-disable-next-line no-console
   console.log('[ProfileScreen] nav ->', dest);
@@ -42,6 +49,8 @@ function ProfileScreen({ navigation }: Props) {
   const [city, setCity] = useState(profile.city);
 
   const [photoSheet, setPhotoSheet] = useState(false);
+  const [customUrl, setCustomUrl] = useState('');
+  const [showUrlInput, setShowUrlInput] = useState(false);
   const [preview, setPreview] = useState<{ src: string; source: string } | null>(null);
 
   const [phoneNumber, setPhoneNumber] = useState<string | undefined>(undefined);
@@ -55,7 +64,7 @@ function ProfileScreen({ navigation }: Props) {
         setGooglePhotoUrl(user.photoURL);
       }
     } catch {
-      // Firebase auth not initialized or optional
+      // Firebase auth optional
     }
   }, []);
 
@@ -78,47 +87,79 @@ function ProfileScreen({ navigation }: Props) {
 
   const initial = name.trim()[0]?.toUpperCase() ?? '?';
 
+  const hasNativeImagePicker = Boolean(
+    NativeModules.ImagePickerManager || NativeModules.RNImagePicker,
+  );
+
   const handlePickFromLibrary = () => {
-    setPhotoSheet(false);
-    launchImageLibrary(
-      {
-        mediaType: 'photo',
-        quality: 0.8,
-        maxWidth: 600,
-        maxHeight: 600,
-      },
-      res => {
-        if (res.didCancel || res.errorCode) return;
-        const uri = res.assets?.[0]?.uri;
-        if (uri) {
-          setPreview({ src: uri, source: 'Photo Library' });
-        }
-      },
-    );
+    if (hasNativeImagePicker) {
+      setPhotoSheet(false);
+      try {
+        launchImageLibrary(
+          {
+            mediaType: 'photo',
+            quality: 0.8,
+            maxWidth: 600,
+            maxHeight: 600,
+          },
+          res => {
+            if (res.didCancel || res.errorCode) return;
+            const uri = res.assets?.[0]?.uri;
+            if (uri) {
+              setPreview({ src: uri, source: 'Photo Library' });
+            }
+          },
+        );
+      } catch {
+        setShowUrlInput(true);
+        showToast('Please enter photo link or choose below');
+      }
+    } else {
+      setShowUrlInput(true);
+      showToast('Select or enter photo link below');
+    }
   };
 
   const handleTakePhoto = () => {
-    setPhotoSheet(false);
-    launchCamera(
-      {
-        mediaType: 'photo',
-        quality: 0.8,
-        maxWidth: 600,
-        maxHeight: 600,
-      },
-      res => {
-        if (res.didCancel || res.errorCode) return;
-        const uri = res.assets?.[0]?.uri;
-        if (uri) {
-          setPreview({ src: uri, source: 'Camera' });
-        }
-      },
-    );
+    if (hasNativeImagePicker) {
+      setPhotoSheet(false);
+      try {
+        launchCamera(
+          {
+            mediaType: 'photo',
+            quality: 0.8,
+            maxWidth: 600,
+            maxHeight: 600,
+          },
+          res => {
+            if (res.didCancel || res.errorCode) return;
+            const uri = res.assets?.[0]?.uri;
+            if (uri) {
+              setPreview({ src: uri, source: 'Camera' });
+            }
+          },
+        );
+      } catch {
+        setShowUrlInput(true);
+        showToast('Please enter photo link or choose below');
+      }
+    } else {
+      setShowUrlInput(true);
+      showToast('Select or enter photo link below');
+    }
   };
 
   const handleUseGooglePhoto = () => {
     setPhotoSheet(false);
     setPreview({ src: googlePhotoUrl, source: 'Google account' });
+  };
+
+  const handleApplyCustomUrl = (urlToUse?: string) => {
+    const target = urlToUse || customUrl.trim();
+    if (!target) return;
+    setPhotoSheet(false);
+    setShowUrlInput(false);
+    setPreview({ src: target, source: 'Image Link' });
   };
 
   const handleRemovePhoto = () => {
@@ -263,7 +304,7 @@ function ProfileScreen({ navigation }: Props) {
               alignItems: 'center',
               gap: spacing.s4,
               paddingVertical: 14,
-              borderBottomWidth: profile.avatarUri ? 1 : 0,
+              borderBottomWidth: 1,
               borderBottomColor: colors.borderSubtle,
             }}
           >
@@ -279,7 +320,55 @@ function ProfileScreen({ navigation }: Props) {
             <CaretRightIcon size={14} color={colors.fg4} />
           </Pressable>
 
-          {/* Option 4: Remove Photo */}
+          {/* Option 4: Paste / select photo link */}
+          <Pressable
+            onPress={() => setShowUrlInput(!showUrlInput)}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.s4,
+              paddingVertical: 14,
+              borderBottomWidth: profile.avatarUri ? 1 : 0,
+              borderBottomColor: colors.borderSubtle,
+            }}
+          >
+            <IconChip icon={LinkIcon} color={colors.navy} bg={colors.bgSurface} />
+            <View style={{ flex: 1 }}>
+              <AppText weight="semibold" style={{ fontSize: 14, color: colors.fg1 }}>
+                Paste photo URL
+              </AppText>
+              <AppText style={{ fontSize: 12, color: colors.fg3, marginTop: 2 }}>
+                Link to any online profile picture
+              </AppText>
+            </View>
+            <CaretRightIcon size={14} color={colors.fg4} />
+          </Pressable>
+
+          {showUrlInput ? (
+            <View style={{ gap: spacing.s2, marginTop: spacing.s2, paddingBottom: spacing.s2 }}>
+              <Field
+                placeholder="https://example.com/photo.jpg"
+                value={customUrl}
+                onChangeText={setCustomUrl}
+              />
+              <Button variant="primary" size="md" onPress={() => handleApplyCustomUrl()}>
+                Preview link
+              </Button>
+
+              <AppText style={{ fontSize: 11, color: colors.fg3, marginTop: spacing.s2 }}>
+                Or select a sample photo:
+              </AppText>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing.s2 }}>
+                {SAMPLE_PHOTOS.map((p, idx) => (
+                  <Pressable key={idx} onPress={() => handleApplyCustomUrl(p.url)}>
+                    <Image source={{ uri: p.url }} style={{ width: 48, height: 48, borderRadius: radii.pill, borderWidth: 1, borderColor: colors.borderDefault }} />
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          ) : null}
+
+          {/* Option 5: Remove Photo */}
           {profile.avatarUri ? (
             <Pressable
               onPress={handleRemovePhoto}

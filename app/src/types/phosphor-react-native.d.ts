@@ -34,6 +34,12 @@ declare module 'phosphor-react-native/lib/module/icons/Camera' {
   export const CameraIcon: Icon;
 }
 
+declare module 'phosphor-react-native/lib/module/icons/Link' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Link: Icon;
+  export const LinkIcon: Icon;
+}
+
 declare module 'phosphor-react-native/lib/module/icons/ArrowRight' {
   import type { Icon } from 'phosphor-react-native';
   export const ArrowRight: Icon;
