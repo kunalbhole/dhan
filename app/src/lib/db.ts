@@ -1,16 +1,11 @@
+// Real SQLite storage for SMS-detected transactions, using @op-engineering/op-sqlite.
 import { open, DB } from '@op-engineering/op-sqlite';
-import { ParsedTxn } from './smsParser';
-import { buildDedupKey } from './dedupKey';
 
 export interface StoredTransaction {
   id: number;
   dedupKey: string;
   sender: string | null;
   merchant: string | null;
-  // The parser's own descriptive line (e.g. "Auto-detected from SMS",
-  // "USD 45 · international") — persisted as-is rather than reconstructed
-  // later, since it already captures things (foreign-currency detail, the
-  // forex-fee note) that aren't derivable from the other stored columns.
   subtitle: string;
   body: string;
   amount: number;
@@ -24,211 +19,208 @@ export interface StoredTransaction {
   createdAt: number;
 }
 
-let dbPromise: Promise<DB> | null = null;
-
-function getDb(): Promise<DB> {
-  if (!dbPromise) {
-    dbPromise = (async () => {
-      const database = open({ name: 'dhan.db' });
-      await database.execute(`
-        CREATE TABLE IF NOT EXISTS transactions (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          dedup_key TEXT NOT NULL,
-          sender TEXT,
-          merchant TEXT,
-          subtitle TEXT NOT NULL,
-          body TEXT NOT NULL,
-          amount REAL NOT NULL,
-          category TEXT NOT NULL,
-          is_foreign_transaction INTEGER NOT NULL DEFAULT 0,
-          original_currency TEXT,
-          original_amount REAL,
-          inr_amount REAL,
-          category_locked INTEGER NOT NULL DEFAULT 0,
-          timestamp INTEGER NOT NULL,
-          created_at INTEGER NOT NULL
-        );
-      `);
-      // Unique index (rather than an inline UNIQUE column constraint) so a
-      // second SMS for the same sender/amount/minute is rejected at the
-      // storage layer, not just filtered in JS.
-      await database.execute(
-        `CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_dedup_key ON transactions(dedup_key);`,
-      );
-      return database;
-    })();
-  }
-  return dbPromise;
-}
-
 export type InsertResult =
   | { status: 'inserted'; transaction: StoredTransaction }
-  | { status: 'duplicate'; dedupKey: string };
+  | { status: 'duplicate'; transaction: StoredTransaction };
+
+let dbInstance: DB | null = null;
+
+export function getDatabase(): DB {
+  if (!dbInstance) {
+    dbInstance = open({ name: 'dhan.db' });
+    dbInstance.executeSync(`
+      CREATE TABLE IF NOT EXISTS transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        dedup_key TEXT UNIQUE NOT NULL,
+        sender TEXT,
+        merchant TEXT,
+        subtitle TEXT NOT NULL,
+        body TEXT NOT NULL,
+        amount REAL NOT NULL,
+        category TEXT NOT NULL,
+        is_foreign INTEGER NOT NULL DEFAULT 0,
+        original_currency TEXT,
+        original_amount REAL,
+        inr_amount REAL,
+        category_locked INTEGER NOT NULL DEFAULT 0,
+        timestamp INTEGER NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+    `);
+  }
+  return dbInstance;
+}
 
 export async function insertTransaction(
-  txn: ParsedTxn,
+  parsed: {
+    m: string | null;
+    s: string;
+    a: number;
+    c: string;
+    isForeignTransaction?: boolean;
+    originalCurrency?: string | null;
+    originalAmount?: number | null;
+    inrAmount?: number | null;
+    categoryLocked?: boolean;
+    raw?: string;
+  },
   sender: string | null,
   timestamp: number,
 ): Promise<InsertResult> {
-  const database = await getDb();
-  const dedupKey = buildDedupKey(sender, txn.a, timestamp);
-  const createdAt = Date.now();
+  const database = getDatabase();
+  const dedupKey = `${sender ?? ''}|${timestamp}|${parsed.a}|${parsed.m ?? ''}`;
 
-  const result = await database.execute(
-    `INSERT OR IGNORE INTO transactions
-       (dedup_key, sender, merchant, subtitle, body, amount, category,
-        is_foreign_transaction, original_currency, original_amount, inr_amount,
-        category_locked, timestamp, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+  const existing = database.executeSync(
+    'SELECT * FROM transactions WHERE dedup_key = ?',
+    [dedupKey],
+  );
+
+  if (existing.rows && existing.rows.length > 0) {
+    const row = existing.rows[0] as Record<string, unknown>;
+    return { status: 'duplicate', transaction: mapRowToTransaction(row) };
+  }
+
+  const now = Date.now();
+  const result = database.executeSync(
+    `INSERT INTO transactions
+     (dedup_key, sender, merchant, subtitle, body, amount, category, is_foreign, original_currency, original_amount, inr_amount, category_locked, timestamp, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       dedupKey,
       sender,
-      txn.m,
-      txn.s,
-      txn.raw ?? '',
-      txn.a,
-      txn.c,
-      txn.isForeignTransaction ? 1 : 0,
-      txn.originalCurrency,
-      txn.originalAmount,
-      txn.inrAmount,
-      txn.categoryLocked ? 1 : 0,
+      parsed.m,
+      parsed.s,
+      parsed.raw ?? '',
+      parsed.a,
+      parsed.c,
+      parsed.isForeignTransaction ? 1 : 0,
+      parsed.originalCurrency ?? null,
+      parsed.originalAmount ?? null,
+      parsed.inrAmount ?? null,
+      parsed.categoryLocked ? 1 : 0,
       timestamp,
-      createdAt,
+      now,
     ],
   );
 
-  if (!result.rowsAffected) {
-    return { status: 'duplicate', dedupKey };
-  }
-
-  const transaction: StoredTransaction = {
-    id: result.insertId as number,
+  const newId = result.insertId ?? now;
+  const stored: StoredTransaction = {
+    id: newId,
     dedupKey,
     sender,
-    merchant: txn.m,
-    subtitle: txn.s,
-    body: txn.raw ?? '',
-    amount: txn.a,
-    category: txn.c,
-    isForeignTransaction: txn.isForeignTransaction,
-    originalCurrency: txn.originalCurrency,
-    originalAmount: txn.originalAmount,
-    inrAmount: txn.inrAmount,
-    categoryLocked: !!txn.categoryLocked,
+    merchant: parsed.m,
+    subtitle: parsed.s,
+    body: parsed.raw ?? '',
+    amount: parsed.a,
+    category: parsed.c,
+    isForeignTransaction: !!parsed.isForeignTransaction,
+    originalCurrency: parsed.originalCurrency ?? null,
+    originalAmount: parsed.originalAmount ?? null,
+    inrAmount: parsed.inrAmount ?? null,
+    categoryLocked: !!parsed.categoryLocked,
     timestamp,
-    createdAt,
+    createdAt: now,
   };
+
   notifyTransactionsChanged();
-  return { status: 'inserted', transaction };
+  return { status: 'inserted', transaction: stored };
 }
 
-export async function getTransactionCount(): Promise<number> {
-  const database = await getDb();
-  const result = await database.execute('SELECT COUNT(*) as count FROM transactions;');
-  return result.rows[0].count as number;
-}
-
-function rowToTransaction(row: Record<string, unknown>): StoredTransaction {
+function mapRowToTransaction(row: Record<string, unknown>): StoredTransaction {
   return {
-    id: row.id as number,
-    dedupKey: row.dedup_key as string,
-    sender: row.sender as string | null,
-    merchant: row.merchant as string | null,
-    subtitle: row.subtitle as string,
-    body: row.body as string,
-    amount: row.amount as number,
+    id: Number(row.id),
+    dedupKey: String(row.dedup_key),
+    sender: row.sender ? String(row.sender) : null,
+    merchant: row.merchant ? String(row.merchant) : null,
+    subtitle: String(row.subtitle),
+    body: String(row.body),
+    amount: Number(row.amount),
     category: row.category as string,
-    isForeignTransaction: !!row.is_foreign_transaction,
-    originalCurrency: row.original_currency as string | null,
-    originalAmount: row.original_amount as number | null,
-    inrAmount: row.inr_amount as number | null,
+    isForeignTransaction: Number(row.is_foreign) === 1,
+    originalCurrency: row.original_currency ? String(row.original_currency) : null,
+    originalAmount: row.original_amount !== null ? Number(row.original_amount) : null,
+    inrAmount: row.inr_amount !== null ? Number(row.inr_amount) : null,
     categoryLocked: !!row.category_locked,
-    timestamp: row.timestamp as number,
-    createdAt: row.created_at as number,
+    timestamp: Number(row.timestamp),
+    createdAt: Number(row.created_at),
   };
 }
 
-export async function getRecentTransactions(limit = 20): Promise<StoredTransaction[]> {
-  const database = await getDb();
-  const result = await database.execute(
-    'SELECT * FROM transactions ORDER BY timestamp DESC LIMIT ?;',
-    [limit],
+export async function getAllTransactions(): Promise<StoredTransaction[]> {
+  const database = getDatabase();
+  const res = database.executeSync(
+    'SELECT * FROM transactions ORDER BY timestamp DESC',
   );
-  return result.rows.map(rowToTransaction);
+  if (!res.rows) return [];
+  return res.rows.map((r: Record<string, unknown>) => mapRowToTransaction(r));
 }
 
-// Real transactions the parser couldn't confidently categorise — guessCategory()
-// falls back to 'other' for these (see smsParser.ts). Locked categories
-// (e.g. forex-fee) are deliberate, not "uncategorised", so they're excluded.
-export async function getUncategorisedTransactions(limit = 20): Promise<StoredTransaction[]> {
-  const database = await getDb();
-  const result = await database.execute(
-    "SELECT * FROM transactions WHERE category = 'other' AND category_locked = 0 ORDER BY timestamp DESC LIMIT ?;",
+export async function getRecentTransactions(limit = 100): Promise<StoredTransaction[]> {
+  const database = getDatabase();
+  const res = database.executeSync(
+    'SELECT * FROM transactions ORDER BY timestamp DESC LIMIT ?',
     [limit],
   );
-  return result.rows.map(rowToTransaction);
+  if (!res.rows) return [];
+  return res.rows.map((r: Record<string, unknown>) => mapRowToTransaction(r));
+}
+
+export async function getUncategorisedTransactions(limit = 100): Promise<StoredTransaction[]> {
+  const database = getDatabase();
+  const res = database.executeSync(
+    "SELECT * FROM transactions WHERE category = 'other' AND category_locked = 0 ORDER BY timestamp DESC LIMIT ?",
+    [limit],
+  );
+  if (!res.rows) return [];
+  return res.rows.map((r: Record<string, unknown>) => mapRowToTransaction(r));
+}
+
+export async function updateTransactionCategory(id: number, category: string): Promise<void> {
+  const database = getDatabase();
+  database.executeSync(
+    'UPDATE transactions SET category = ?, category_locked = 1 WHERE id = ?',
+    [category, id],
+  );
+  notifyTransactionsChanged();
 }
 
 export async function deleteTransaction(id: number): Promise<void> {
-  const database = await getDb();
-  await database.execute('DELETE FROM transactions WHERE id = ?;', [id]);
+  const database = getDatabase();
+  database.executeSync('DELETE FROM transactions WHERE id = ?', [id]);
   notifyTransactionsChanged();
 }
 
-// Unbounded — for backup export only (src/lib/backupService.ts). Every
-// other reader deliberately takes a `limit` since screens only ever need a
-// bounded slice; a full dump is this function's one job.
-export async function getAllTransactions(): Promise<StoredTransaction[]> {
-  const database = await getDb();
-  const result = await database.execute('SELECT * FROM transactions ORDER BY timestamp DESC;');
-  return result.rows.map(rowToTransaction);
+export async function restoreTransactions(list: StoredTransaction[]): Promise<number> {
+  const database = getDatabase();
+  let restored = 0;
+  for (const t of list) {
+    const res = database.executeSync(
+      `INSERT OR IGNORE INTO transactions
+       (dedup_key, sender, merchant, subtitle, body, amount, category, is_foreign, original_currency, original_amount, inr_amount, category_locked, timestamp, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        t.dedupKey,
+        t.sender,
+        t.merchant,
+        t.subtitle,
+        t.body,
+        t.amount,
+        t.category,
+        t.isForeignTransaction ? 1 : 0,
+        t.originalCurrency,
+        t.originalAmount,
+        t.inrAmount,
+        t.categoryLocked ? 1 : 0,
+        t.timestamp,
+        t.createdAt || Date.now(),
+      ],
+    );
+    if (res.rowsAffected) restored++;
+  }
+  if (restored) notifyTransactionsChanged();
+  return restored;
 }
 
-// For restore only (src/lib/backupService.ts), against a freshly onboarded,
-// empty local DB — never against a live user's existing data (see
-// RestorePromptScreen, gated on hasAccount() === false). `INSERT OR IGNORE`
-// keyed on dedup_key, same as insertTransaction, makes this idempotent
-// rather than because any real conflict is expected. Wrapped in one
-// transaction so a large backup restores as a single atomic write.
-export async function restoreTransactions(rows: StoredTransaction[]): Promise<number> {
-  const database = await getDb();
-  let inserted = 0;
-  await database.transaction(async tx => {
-    for (const row of rows) {
-      const result = await tx.execute(
-        `INSERT OR IGNORE INTO transactions
-           (dedup_key, sender, merchant, subtitle, body, amount, category,
-            is_foreign_transaction, original_currency, original_amount, inr_amount,
-            category_locked, timestamp, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-        [
-          row.dedupKey,
-          row.sender,
-          row.merchant,
-          row.subtitle,
-          row.body,
-          row.amount,
-          row.category,
-          row.isForeignTransaction ? 1 : 0,
-          row.originalCurrency,
-          row.originalAmount,
-          row.inrAmount,
-          row.categoryLocked ? 1 : 0,
-          row.timestamp,
-          row.createdAt,
-        ],
-      );
-      if (result.rowsAffected) inserted += 1;
-    }
-  });
-  if (inserted) notifyTransactionsChanged();
-  return inserted;
-}
-
-// Lets any mounted screen react to a new transaction being stored (SMS
-// parsing happens at the app root in App.tsx, decoupled from whichever
-// screen is on top) without polling or a focus-based refetch.
 type TransactionsChangeListener = () => void;
 const changeListeners = new Set<TransactionsChangeListener>();
 

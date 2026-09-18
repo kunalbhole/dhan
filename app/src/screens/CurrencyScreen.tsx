@@ -71,7 +71,7 @@ function CurrencyScreen({ navigation }: Props) {
             <Pressable
               key={c.id}
               accessibilityLabel={`${c.label} — Dhan Plus feature, upgrade to unlock`}
-              onPress={() => stubNav('paywall')}
+              onPress={() => navigation.navigate('PlusPaywall', { note: 'Manage multi-currency balances with Dhan Plus' })}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',

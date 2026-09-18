@@ -2,16 +2,18 @@ import { ComponentType, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ChatCenteredTextIcon } from 'phosphor-react-native/lib/module/icons/ChatCenteredText';
-import { BellIcon } from 'phosphor-react-native/lib/module/icons/Bell';
 import { AddressBookIcon } from 'phosphor-react-native/lib/module/icons/AddressBook';
-import { ShieldCheckIcon } from 'phosphor-react-native/lib/module/icons/ShieldCheck';
 import { ArrowRightIcon } from 'phosphor-react-native/lib/module/icons/ArrowRight';
+import { BellIcon } from 'phosphor-react-native/lib/module/icons/Bell';
+import { ChatCenteredTextIcon } from 'phosphor-react-native/lib/module/icons/ChatCenteredText';
+import { ShieldCheckIcon } from 'phosphor-react-native/lib/module/icons/ShieldCheck';
 import AppText from '../../components/AppText';
 import Button from '../../components/Button';
 import ScreenHeader from '../../components/ScreenHeader';
 import Toggle from '../../components/Toggle';
 import { colors, radii, spacing, typography } from '../../theme';
+import { requestSmsPermission } from '../../native/sms';
+import { scanAndProcessInbox } from '../../lib/smsPipeline';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Permissions'>;
@@ -27,9 +29,6 @@ interface PermItem {
   color: string;
 }
 
-// Copy and colors ported verbatim from screens-extra-auth.jsx's
-// PermissionsScreen. "contacts" color (#7C9B5F) is the same value as
-// theme.colors.catBills, reused here rather than duplicated.
 const ITEMS: PermItem[] = [
   {
     id: 'sms',
@@ -61,8 +60,24 @@ function PermissionsScreen({ navigation }: Props) {
     notif: true,
     contacts: false,
   });
+  const [loading, setLoading] = useState(false);
 
-  const goNext = () => navigation.navigate('LinkBank');
+  const goNext = async () => {
+    setLoading(true);
+    try {
+      if (perms.sms) {
+        const granted = await requestSmsPermission();
+        if (granted) {
+          await scanAndProcessInbox(500);
+        }
+      }
+    } catch {
+      // Permission optional / continuation guaranteed
+    } finally {
+      setLoading(false);
+      navigation.navigate('LinkBank');
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -115,8 +130,15 @@ function PermissionsScreen({ navigation }: Props) {
           </AppText>
         </View>
 
-        <Button variant="primary" full size="lg" iconRight={ArrowRightIcon} onPress={goNext}>
-          Continue
+        <Button
+          variant="primary"
+          full
+          size="lg"
+          iconRight={ArrowRightIcon}
+          disabled={loading}
+          onPress={goNext}
+        >
+          {loading ? 'Scanning SMS history...' : 'Continue'}
         </Button>
       </View>
     </SafeAreaView>

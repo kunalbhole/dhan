@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Image, NativeModules, Pressable, ScrollView, View } from 'react-native';
+import { Image, NativeModules, PermissionsAndroid, Platform, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { getAuth } from '@react-native-firebase/auth';
@@ -41,6 +41,46 @@ const stubNav = (dest: string) => {
   console.log('[ProfileScreen] nav ->', dest);
 };
 
+async function requestCameraPermission(): Promise<boolean> {
+  if (Platform.OS !== 'android') return true;
+  try {
+    const granted = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.CAMERA,
+      {
+        title: 'Camera Permission',
+        message: 'Dhan needs access to your camera to take a profile picture.',
+        buttonNeutral: 'Ask Me Later',
+        buttonNegative: 'Cancel',
+        buttonPositive: 'OK',
+      },
+    );
+    return granted === PermissionsAndroid.RESULTS.GRANTED;
+  } catch {
+    return false;
+  }
+}
+
+async function requestGalleryPermission(): Promise<boolean> {
+  if (Platform.OS !== 'android') return true;
+  try {
+    const permission =
+      Number(Platform.Version) >= 33
+        ? PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES
+        : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
+
+    const granted = await PermissionsAndroid.request(permission, {
+      title: 'Photo Library Permission',
+      message: 'Dhan needs access to your photo library to select a profile picture.',
+      buttonNeutral: 'Ask Me Later',
+      buttonNegative: 'Cancel',
+      buttonPositive: 'OK',
+    });
+    return granted === PermissionsAndroid.RESULTS.GRANTED;
+  } catch {
+    return false;
+  }
+}
+
 function ProfileScreen({ navigation }: Props) {
   const [profile, setProfile] = useState(getProfile());
   const [name, setName] = useState(profile.name);
@@ -79,6 +119,11 @@ function ProfileScreen({ navigation }: Props) {
     });
   }, []);
 
+  const openPhotoSheet = () => {
+    setShowUrlInput(false);
+    setPhotoSheet(true);
+  };
+
   const commit = (field: 'name' | 'email' | 'dob' | 'city', value: string) => {
     if (profile[field] === value) return;
     setProfileField(field, value);
@@ -91,7 +136,12 @@ function ProfileScreen({ navigation }: Props) {
     NativeModules.ImagePickerManager || NativeModules.RNImagePicker,
   );
 
-  const handlePickFromLibrary = () => {
+  const handlePickFromLibrary = async () => {
+    const hasPermission = await requestGalleryPermission();
+    if (!hasPermission) {
+      showToast('Gallery permission required to select photo');
+      return;
+    }
     if (hasNativeImagePicker) {
       setPhotoSheet(false);
       try {
@@ -112,15 +162,22 @@ function ProfileScreen({ navigation }: Props) {
         );
       } catch {
         setShowUrlInput(true);
+        setPhotoSheet(true);
         showToast('Please enter photo link or choose below');
       }
     } else {
       setShowUrlInput(true);
+      setPhotoSheet(true);
       showToast('Select or enter photo link below');
     }
   };
 
-  const handleTakePhoto = () => {
+  const handleTakePhoto = async () => {
+    const hasPermission = await requestCameraPermission();
+    if (!hasPermission) {
+      showToast('Camera permission required to take photo');
+      return;
+    }
     if (hasNativeImagePicker) {
       setPhotoSheet(false);
       try {
@@ -141,10 +198,12 @@ function ProfileScreen({ navigation }: Props) {
         );
       } catch {
         setShowUrlInput(true);
+        setPhotoSheet(true);
         showToast('Please enter photo link or choose below');
       }
     } else {
       setShowUrlInput(true);
+      setPhotoSheet(true);
       showToast('Select or enter photo link below');
     }
   };
@@ -182,7 +241,7 @@ function ProfileScreen({ navigation }: Props) {
       <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.s5, paddingBottom: spacing.s6 }}>
         {/* Profile Avatar Section */}
         <View style={{ alignItems: 'center', paddingVertical: spacing.s3 + 2 }}>
-          <Pressable onPress={() => setPhotoSheet(true)} style={{ width: 92, height: 92 }}>
+          <Pressable onPress={openPhotoSheet} style={{ width: 92, height: 92 }}>
             {profile.avatarUri ? (
               <Image
                 source={{ uri: profile.avatarUri }}
@@ -213,7 +272,7 @@ function ProfileScreen({ navigation }: Props) {
               <CameraIcon size={14} color={colors.fgOnDark} />
             </View>
           </Pressable>
-          <Pressable onPress={() => setPhotoSheet(true)}>
+          <Pressable onPress={openPhotoSheet}>
             <AppText style={{ fontSize: 12, color: colors.fg3, marginTop: spacing.s2 + 2 }}>
               Tap to change photo
             </AppText>
@@ -237,11 +296,20 @@ function ProfileScreen({ navigation }: Props) {
           Account
         </AppText>
         <Card style={{ paddingHorizontal: spacing.s4, paddingVertical: 0 }}>
-          <DetailRow icon={KeyIcon} label="Change PIN" chevron onPress={() => stubNav('change-pin')} />
-          <DetailRow icon={ShieldCheckIcon} label="Two-factor auth" chevron onPress={() => stubNav('two-factor')}>
+          <DetailRow icon={KeyIcon} label="Change PIN" chevron onPress={() => navigation.navigate('AppLock')} />
+          <DetailRow icon={ShieldCheckIcon} label="Two-factor auth" chevron onPress={() => navigation.navigate('AppLock')}>
             Off
           </DetailRow>
-          <DetailRow icon={TrashIcon} iconColor={colors.expense} iconBg={colors.expenseBg} label="Delete account" labelColor={colors.expense} last chevron onPress={() => stubNav('delete-account')} />
+          <DetailRow
+            icon={TrashIcon}
+            iconColor={colors.expense}
+            iconBg={colors.expenseBg}
+            label="Delete account"
+            labelColor={colors.expense}
+            last
+            chevron
+            onPress={() => showToast('Account deletion request initiated')}
+          />
         </Card>
       </ScrollView>
 

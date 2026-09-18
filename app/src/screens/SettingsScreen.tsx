@@ -239,7 +239,7 @@ function SettingsScreen({ navigation }: Props) {
         </Card>
 
         {/* Plus */}
-        <Pressable onPress={() => (isPlus ? setIsPlus(false) : stubNav('paywall'))}>
+        <Pressable onPress={() => (isPlus ? setIsPlus(false) : navigation.navigate('PlusPaywall'))}>
           <View
             style={{
               backgroundColor: colors.navy,

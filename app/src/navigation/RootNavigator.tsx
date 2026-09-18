@@ -31,6 +31,10 @@ import AboutDhanScreen from '../screens/AboutDhanScreen';
 import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import ContactSupportScreen from '../screens/ContactSupportScreen';
+import PlusPaywallScreen from '../screens/PlusPaywallScreen';
+import UncategorisedScreen from '../screens/UncategorisedScreen';
+import CategoryTxnsScreen from '../screens/CategoryTxnsScreen';
+import BudgetEditScreen from '../screens/BudgetEditScreen';
 import type { Bill } from '../lib/bills';
 import SplashScreen from '../screens/onboarding/SplashScreen';
 import RestorePromptScreen from '../screens/onboarding/RestorePromptScreen';
@@ -42,14 +46,8 @@ import IncomeSetupScreen from '../screens/onboarding/IncomeSetupScreen';
 import FrameworkScreen from '../screens/onboarding/FrameworkScreen';
 import type { StoredTransaction } from '../lib/db';
 
-// Mirrors app.jsx's FLOW chain: splash -> onboarding -> signup -> permissions
-// -> linkbank -> income -> framework -> home. Framework is the last
-// onboarding step; every screen now routes to a real next screen.
 export type RootStackParamList = {
   Splash: undefined;
-  // Fresh install / new device only (Splash routes here instead of
-  // Onboarding when !hasAccount()) — "Restore from Google Drive" vs
-  // "Start fresh". See src/lib/backupService.ts.
   Restore: undefined;
   Onboarding: undefined;
   SignUp: undefined;
@@ -58,71 +56,29 @@ export type RootStackParamList = {
   IncomeSetup: undefined;
   Framework: undefined;
   Home: undefined;
-  // Carries the tapped row's full record rather than just an id — every
-  // caller (Home's recent list today, Transactions/Uncategorised/Bills
-  // later) already has the StoredTransaction in hand, so this avoids an
-  // extra db round-trip on every open.
-  TxnDetail: { transaction: StoredTransaction };
-  // Reached via AppHeader's D-logo ("Menu") button — confirmed against
-  // screens-main.jsx's `onMenu={() => nav?.("more")}` and app.jsx's
-  // `nav("more")` -> `setView("settings")`.
+  TxnDetail: { id?: string; transaction?: StoredTransaction };
   Settings: undefined;
-  // Reached via AppHeader's search icon (`onSearch`) — confirmed against
-  // screens-main.jsx's `onSearch={() => nav?.("search")}`.
   Search: undefined;
-  // Reached via AppHeader's bell icon (`onNotify`) — confirmed against
-  // screens-main.jsx's `onNotify={() => nav?.("notifications")}`.
   Notifications: undefined;
-  // The "Txns" bottom-nav tab (screens-main.jsx's TransactionsScreen).
   Transactions: undefined;
-  // The "Budget" bottom-nav tab (screens-main.jsx's BudgetScreen).
   Budget: undefined;
-  // The "Bills" bottom-nav tab (screens-main.jsx's BillsScreen).
   Bills: undefined;
   BillDetail: { bill: Bill };
-  // Reached from Settings' "Data & privacy" section.
   BackupSettings: undefined;
-  // The "Split" bottom-nav tab (screens-split.jsx's SplitsScreen).
   Splits: undefined;
   FriendDetail: { friendId: string };
   GroupDetail: { groupId: string };
-  // Reached from Home's "Savings goals" card and Settings' "Savings goals"
-  // row (screens-extra-detail.jsx's GoalsScreen).
   Goals: undefined;
-  // Reached from Home's insights teaser and Settings' "Insights" row
-  // (insights.jsx's InsightsScreen).
   Insights: undefined;
-  // Reached from Settings' own identity card and its "Profile" row
-  // (screens-extra-detail.jsx's ProfileEditScreen).
   Profile: undefined;
-  // Reached from Settings' "App lock" row (settings-sub.jsx's
-  // AppLockScreen).
   AppLock: undefined;
-  // Reached from Settings' "SMS sources" row (settings-sub.jsx's
-  // SmsSourcesScreen).
   SmsSources: undefined;
-  // Reached from Settings' "Notifications" row (settings-sub.jsx's
-  // NotifSettingsScreen) — distinct from the bell-icon "Notifications"
-  // inbox route above, matching the reference's own two separate screens.
   NotifSettings: undefined;
-  // Reached from Settings' "Currency converter" row
-  // (currency-converter.jsx's CurrencyConverterScreen).
   CurrencyConverter: undefined;
-  // Reached from Settings' "Language" row (settings-sub.jsx's
-  // LanguageScreen).
   Language: undefined;
-  // Reached from Settings' "Currency" row (settings-sub.jsx's
-  // CurrencyScreen) — the base-currency preference, distinct from the
-  // CurrencyConverter route above.
   Currency: undefined;
-  // Reached from Settings' "Appearance" row (settings-sub.jsx's
-  // AppearanceScreen).
   Appearance: undefined;
-  // Reached from Settings' "Export data" row (settings-sub.jsx's
-  // ExportDataScreen).
   ExportData: undefined;
-  // Reached from Settings' "Privacy settings" row (settings-sub.jsx's
-  // PrivacySettingsScreen).
   PrivacySettings: undefined;
   LinkedAccounts: undefined;
   HelpSupport: undefined;
@@ -130,6 +86,10 @@ export type RootStackParamList = {
   TermsOfService: undefined;
   PrivacyPolicy: undefined;
   ContactSupport: undefined;
+  PlusPaywall: { note?: string } | undefined;
+  Uncategorised: undefined;
+  CategoryTxns: { category: string };
+  BudgetEdit: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -177,6 +137,10 @@ function RootNavigator() {
         <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="ContactSupport" component={ContactSupportScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="PlusPaywall" component={PlusPaywallScreen} options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="Uncategorised" component={UncategorisedScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="CategoryTxns" component={CategoryTxnsScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="BudgetEdit" component={BudgetEditScreen} options={{ animation: 'slide_from_right' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

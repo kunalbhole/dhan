@@ -110,7 +110,7 @@ function SplitsScreen({ navigation }: Props) {
           </Card>
         )}
 
-        <Pressable onPress={() => stubNav('paywall')} style={{ backgroundColor: colors.navy, borderRadius: radii.card, padding: spacing.s4, marginTop: spacing.s4 }}>
+        <Pressable onPress={() => navigation.navigate('PlusPaywall', { note: 'Track unlimited split groups with Dhan Plus' })} style={{ backgroundColor: colors.navy, borderRadius: radii.card, padding: spacing.s4, marginTop: spacing.s4 }}>
           <AppText weight="semibold" style={{ fontSize: 15, color: colors.fgOnDark }}>
             Upgrade to track unlimited friends
           </AppText>

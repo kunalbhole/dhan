@@ -1,7 +1,8 @@
-import { useEffect, useState, type ComponentType } from 'react';
+import React, { useEffect, useState, type ComponentType } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import { CaretLeftIcon } from 'phosphor-react-native/lib/module/icons/CaretLeft';
 import { CaretRightIcon } from 'phosphor-react-native/lib/module/icons/CaretRight';
 import { CaretDownIcon } from 'phosphor-react-native/lib/module/icons/CaretDown';
@@ -95,9 +96,10 @@ const stubNav = (dest: string) => {
 // subscription state yet — every user is effectively free-tier — so this
 // is the only state "Edit categories" ever renders.
 function LockedEditButton() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   return (
     <Pressable
-      onPress={() => stubNav('paywall')}
+      onPress={() => navigation.navigate('PlusPaywall')}
       style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s2 }}
     >
       <View style={{ borderWidth: 1, borderColor: colors.gold, borderRadius: radii.pill, paddingVertical: 3, paddingHorizontal: 8 }}>
@@ -106,7 +108,7 @@ function LockedEditButton() {
         </AppText>
       </View>
       <View style={{ opacity: 0.6, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-        <GoldButton onPress={() => stubNav('paywall')} iconRight={LockSimpleIcon}>
+        <GoldButton onPress={() => navigation.navigate('PlusPaywall')} iconRight={LockSimpleIcon}>
           Edit categories
         </GoldButton>
       </View>
@@ -230,7 +232,7 @@ function BudgetScreen({ navigation }: Props) {
       <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.s4, paddingBottom: spacing.s6 }}>
         <UncatCard
           list={uncatTxns.map(t => ({ id: String(t.id), m: t.merchant ?? 'Unknown', s: `${t.subtitle} · ${formatTime(t.timestamp)}`, a: t.amount }))}
-          onCategorise={() => stubNav('uncat')}
+          onCategorise={() => navigation.navigate('Uncategorised')}
         />
 
         {/* Personal budget */}
@@ -373,7 +375,7 @@ function BudgetScreen({ navigation }: Props) {
                           return (
                             <Pressable
                               key={sub.key}
-                              onPress={() => stubNav('cat-txns')}
+                              onPress={() => navigation.navigate('CategoryTxns', { category: sub.key })}
                               style={{ marginTop: i === 0 ? 0 : spacing.s3, paddingLeft: spacing.s2 }}
                             >
                               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.s3 - 2, marginBottom: 6 }}>
@@ -583,7 +585,7 @@ function BudgetScreen({ navigation }: Props) {
             const id = cardMenu;
             setCardMenu(null);
             setOpenBudget(id);
-            stubNav('edit-budget');
+            navigation.navigate('BudgetEdit');
           }}
           style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s4, paddingVertical: spacing.s4, borderBottomWidth: cardMenu !== 'personal' ? 1 : 0, borderBottomColor: colors.borderSubtle }}
         >

@@ -18,6 +18,7 @@ import StatusPill from '../components/StatusPill';
 import TabBar, { type TabId } from '../components/TabBar';
 import TxnRow from '../components/TxnRow';
 import UncatCard from '../components/UncatCard';
+import { showToast } from '../lib/toast';
 import InsightsTeaser from '../components/InsightsTeaser';
 import { colors, radii, shadows, spacing } from '../theme';
 import { frameworkBuckets, type FrameworkBucket } from '../lib/frameworks';
@@ -205,7 +206,10 @@ function HomeScreen({ navigation }: Props) {
             return (
               <Pressable
                 key={q.id}
-                onPress={() => stubNav(q.id)}
+                onPress={() => {
+                  if (q.id === 'insights') navigation.navigate('Insights');
+                  else showToast('Use the + button at top to add transactions');
+                }}
                 style={{
                   flex: 1,
                   backgroundColor: colors.bgElevated,
@@ -242,7 +246,7 @@ function HomeScreen({ navigation }: Props) {
             is empty, which is the correct empty state for this nudge card. */}
         <UncatCard
           list={uncatTxns.map(t => ({ id: String(t.id), m: t.merchant ?? 'Unknown', s: txnMeta(t), a: t.amount }))}
-          onCategorise={() => stubNav('uncat')}
+          onCategorise={() => navigation.navigate('Uncategorised')}
         />
 
         {/* This month's budget */}

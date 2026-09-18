@@ -36,7 +36,7 @@ import { getMonthlyIncome, getFramework, DEFAULT_FRAMEWORK } from '../lib/accoun
 import { spentOn } from '../lib/budget';
 import { isThisMonth } from '../lib/dateRange';
 import { showToast } from '../lib/toast';
-import { deleteTransaction, getRecentTransactions, type StoredTransaction } from '../lib/db';
+import { deleteTransaction, getAllTransactions, getRecentTransactions, type StoredTransaction } from '../lib/db';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TxnDetail'>;
@@ -63,7 +63,18 @@ function fmt(n: number, d = 2): string {
 // built). The 3-dot "Share screenshot" action stays a no-op — that's a
 // no-op in the reference itself too (its own handler only closes the menu).
 function TxnDetailScreen({ route, navigation }: Props) {
-  const { transaction: t } = route.params;
+  const { transaction: routeTxn, id: routeId } = route.params || {};
+  const [t, setTxn] = useState<StoredTransaction | null>(routeTxn ?? null);
+
+  useEffect(() => {
+    if (!t && routeId) {
+      getAllTransactions().then(all => {
+        const found = all.find(x => String(x.id) === String(routeId));
+        if (found) setTxn(found);
+      });
+    }
+  }, [t, routeId]);
+
   const [menu, setMenu] = useState(false);
   const [splitOpen, setSplitOpen] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
@@ -79,24 +90,27 @@ function TxnDetailScreen({ route, navigation }: Props) {
   const [framework, setFrameworkId] = useState(DEFAULT_FRAMEWORK);
   const [monthTxns, setMonthTxns] = useState<StoredTransaction[]>([]);
 
+  useEffect(() => {
+    Promise.all([getMonthlyIncome(), getFramework(), getRecentTransactions(1000)]).then(([storedIncome, storedFramework, all]) => {
+      setIncome(storedIncome);
+      setFrameworkId(storedFramework);
+      setMonthTxns(all.filter((row: StoredTransaction) => isThisMonth(row.timestamp)));
+    });
+  }, []);
+
+  if (!t) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bgBase, justifyContent: 'center', alignItems: 'center' }}>
+        <AppText style={{ color: colors.fg3 }}>Loading transaction details...</AppText>
+      </SafeAreaView>
+    );
+  }
+
   const isIncome = t.amount > 0;
   const cat = CATEGORIES[t.category] || CATEGORIES.other;
   const CatIcon = CATEGORY_ICONS[t.category] || CATEGORY_ICONS.other;
   const merchant = t.merchant ?? 'Unknown';
   const day = formatDay(t.timestamp);
-
-  // Real budget-impact data for the "Mini budget impact" card below — the
-  // bucket (Needs/Wants/Savings) this transaction's category rolls up
-  // into, same source HomeScreen and BudgetScreen use. There's no real
-  // per-category cap yet, only the 3-bucket split from onboarding, so the
-  // card reports impact at that level rather than a fabricated category cap.
-  useEffect(() => {
-    Promise.all([getMonthlyIncome(), getFramework(), getRecentTransactions(1000)]).then(([storedIncome, storedFramework, all]) => {
-      setIncome(storedIncome);
-      setFrameworkId(storedFramework);
-      setMonthTxns(all.filter(row => isThisMonth(row.timestamp)));
-    });
-  }, []);
 
   const bucket = frameworkBuckets(framework).find(b => b.cats.includes(t.category)) ?? null;
   const bucketCap = bucket ? Math.round(((income ?? 0) * bucket.pct) / 100) : 0;

@@ -16,11 +16,12 @@ import com.facebook.react.modules.core.PermissionAwareActivity
 import com.facebook.react.modules.core.PermissionListener
 
 /**
- * Bridges incoming-SMS capture to JS. This module's only jobs are:
+ * Bridges incoming-SMS capture to JS. This module's jobs are:
  *   1. requesting RECEIVE_SMS / READ_SMS at runtime,
- *   2. registering/unregistering the BroadcastReceiver, and
- *   3. forwarding the raw sender/body/timestamp as an "onSmsReceived" event.
- * No message parsing happens here — that's JS's job (sms-parser.js).
+ *   2. registering/unregistering the BroadcastReceiver,
+ *   3. querying Telephony.Sms.Inbox to scan existing past SMS messages, and
+ *   4. forwarding raw sender/body/timestamp as an "onSmsReceived" event.
+ * No message parsing happens here — that's JS's job (smsParser.ts).
  */
 class SmsModule(reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
@@ -96,6 +97,58 @@ class SmsModule(reactContext: ReactApplicationContext) :
     )
   }
 
+  /**
+   * Queries content://sms/inbox to read existing bank/transaction SMS messages
+   * already present in the user's phone inbox.
+   */
+  @ReactMethod
+  fun readExistingSms(limit: Int, promise: Promise) {
+    if (!hasSmsPermissions()) {
+      promise.reject("PERMISSION_DENIED", "SMS permissions not granted")
+      return
+    }
+
+    try {
+      val maxCount = if (limit > 0) limit else 500
+      val cursor = reactApplicationContext.contentResolver.query(
+        Telephony.Sms.Inbox.CONTENT_URI,
+        arrayOf(
+          Telephony.Sms.ADDRESS,
+          Telephony.Sms.BODY,
+          Telephony.Sms.DATE
+        ),
+        null,
+        null,
+        "${Telephony.Sms.DATE} DESC LIMIT $maxCount"
+      )
+
+      val array = Arguments.createArray()
+      cursor?.use {
+        val addressIdx = it.getColumnIndex(Telephony.Sms.ADDRESS)
+        val bodyIdx = it.getColumnIndex(Telephony.Sms.BODY)
+        val dateIdx = it.getColumnIndex(Telephony.Sms.DATE)
+
+        while (it.moveToNext()) {
+          val sender = if (addressIdx >= 0) it.getString(addressIdx) else null
+          val body = if (bodyIdx >= 0) it.getString(bodyIdx) else ""
+          val date = if (dateIdx >= 0) it.getLong(dateIdx) else System.currentTimeMillis()
+
+          val map = Arguments.createMap().apply {
+            putString("sender", sender)
+            putString("body", body)
+            putDouble("timestamp", date.toDouble())
+          }
+          array.pushMap(map)
+        }
+      }
+      Log.d(TAG, "readExistingSms: successfully scanned ${array.size()} messages")
+      promise.resolve(array)
+    } catch (e: Exception) {
+      Log.e(TAG, "readExistingSms error: ${e.message}", e)
+      promise.reject("READ_SMS_ERROR", e.message, e)
+    }
+  }
+
   private fun startListening() {
     if (receiver != null) {
       Log.d(TAG, "startListening: already registered, skipping")
@@ -114,12 +167,6 @@ class SmsModule(reactContext: ReactApplicationContext) :
         .emit("onSmsReceived", payload)
     }
     val r = SmsReceiver(onSms)
-    // SMS_RECEIVED is a protected broadcast — only privileged system
-    // processes can send it, so no arbitrary app can spoof it and
-    // RECEIVER_EXPORTED is safe. RECEIVER_NOT_EXPORTED silently drops it
-    // here: the telephony stack broadcasts as uid 1001 (radio/phone), not
-    // the literal system uid, and NOT_EXPORTED's same-app-or-system check
-    // excludes that sender.
     ContextCompat.registerReceiver(
       reactApplicationContext,
       r,
@@ -138,8 +185,6 @@ class SmsModule(reactContext: ReactApplicationContext) :
     receiver = null
   }
 
-  // Required by NativeEventEmitter on Android even though we don't need to
-  // react to (un)subscribe counts — the JS side manages listener lifecycle.
   @ReactMethod
   fun addListener(eventName: String) {}
 

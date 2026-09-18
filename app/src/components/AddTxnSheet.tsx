@@ -59,7 +59,6 @@ function AddTxnSheet({ open, onClose, onSaved, initial = {} }: AddTxnSheetProps)
     const category = kind === 'income' ? 'income' : cat;
     await insertTransaction(
       {
-        id: null,
         m: merchant.trim(),
         s: note.trim() || (kind === 'income' ? 'Income · Manual entry' : 'Manual entry'),
         a: kind === 'income' ? parsedAmt : -parsedAmt,
