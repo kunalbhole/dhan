@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Image, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { ArrowRightIcon } from 'phosphor-react-native/lib/module/icons/ArrowRight';
 import { CheckCircleIcon } from 'phosphor-react-native/lib/module/icons/CheckCircle';
 import { DownloadSimpleIcon } from 'phosphor-react-native/lib/module/icons/DownloadSimple';
 import { ShieldCheckIcon } from 'phosphor-react-native/lib/module/icons/ShieldCheck';
@@ -199,7 +200,13 @@ function PlusPaywallScreen({ navigation, route }: Props) {
           })}
         </View>
 
-        <Button variant="primary" full size="lg" onPress={() => setMandateSheet(true)}>
+        <Button
+          variant="gold"
+          full
+          size="lg"
+          iconRight={ArrowRightIcon}
+          onPress={() => setMandateSheet(true)}
+        >
           Start 3-month free trial
         </Button>
       </ScrollView>
@@ -261,7 +268,7 @@ function PlusPaywallScreen({ navigation, route }: Props) {
 
           <View style={{ marginTop: spacing.s2 }}>
             <Button variant="primary" full size="lg" onPress={handleConfirmMandate}>
-              Approve Mandate & Start Trial
+              Approve Mandate &amp; Start Trial
             </Button>
           </View>
         </View>
