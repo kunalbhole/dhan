@@ -13,6 +13,8 @@ import BackupSettingsScreen from '../screens/BackupSettingsScreen';
 import SplitsScreen from '../screens/SplitsScreen';
 import FriendDetailScreen from '../screens/FriendDetailScreen';
 import GroupDetailScreen from '../screens/GroupDetailScreen';
+import GoalsScreen from '../screens/GoalsScreen';
+import InsightsScreen from '../screens/InsightsScreen';
 import type { Bill } from '../lib/bills';
 import SplashScreen from '../screens/onboarding/SplashScreen';
 import RestorePromptScreen from '../screens/onboarding/RestorePromptScreen';
@@ -68,6 +70,12 @@ export type RootStackParamList = {
   Splits: undefined;
   FriendDetail: { friendId: string };
   GroupDetail: { groupId: string };
+  // Reached from Home's "Savings goals" card and Settings' "Savings goals"
+  // row (screens-extra-detail.jsx's GoalsScreen).
+  Goals: undefined;
+  // Reached from Home's insights teaser and Settings' "Insights" row
+  // (insights.jsx's InsightsScreen).
+  Insights: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -97,6 +105,8 @@ function RootNavigator() {
         <Stack.Screen name="Splits" component={SplitsScreen} />
         <Stack.Screen name="FriendDetail" component={FriendDetailScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="GroupDetail" component={GroupDetailScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="Goals" component={GoalsScreen} options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="Insights" component={InsightsScreen} options={{ animation: 'slide_from_right' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

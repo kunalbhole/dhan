@@ -136,9 +136,18 @@ function SettingsScreen({ navigation }: Props) {
     navigation.reset({ index: 0, routes: [{ name: 'Splash' }] });
   };
 
+  // Settings/More sits in the same root stack as every other tab's screen
+  // (see RootNavigator.tsx) — there's no separate tab navigator to escape,
+  // so each id just needs its own real destination the way BillsScreen's/
+  // TransactionsScreen's own handleTab already does. This previously only
+  // handled 'home' and stubbed the rest, which is why Txns/Budget/Bills/
+  // Split did nothing when tapped from here.
   const handleTab = (id: TabId) => {
     if (id === 'home') navigation.navigate('Home');
-    else stubNav(id);
+    else if (id === 'txn') navigation.navigate('Transactions');
+    else if (id === 'budget') navigation.navigate('Budget');
+    else if (id === 'bills') navigation.navigate('Bills');
+    else if (id === 'split') navigation.navigate('Splits');
   };
 
   return (
@@ -223,6 +232,8 @@ function SettingsScreen({ navigation }: Props) {
                       : () => {
                           if (item.action === 'signout') setSignOutOpen(true);
                           else if (item.action === 'backup') navigation.navigate('BackupSettings');
+                          else if (item.go === 'goals') navigation.navigate('Goals');
+                          else if (item.go === 'insights') navigation.navigate('Insights');
                           else stubNav(item.go ?? '');
                         }
                   }

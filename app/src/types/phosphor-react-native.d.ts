@@ -64,6 +64,24 @@ declare module 'phosphor-react-native/lib/module/icons/Plus' {
   export const PlusIcon: Icon;
 }
 
+declare module 'phosphor-react-native/lib/module/icons/AirplaneTilt' {
+  import type { Icon } from 'phosphor-react-native';
+  export const AirplaneTilt: Icon;
+  export const AirplaneTiltIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Laptop' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Laptop: Icon;
+  export const LaptopIcon: Icon;
+}
+
+declare module 'phosphor-react-native/lib/module/icons/Car' {
+  import type { Icon } from 'phosphor-react-native';
+  export const Car: Icon;
+  export const CarIcon: Icon;
+}
+
 declare module 'phosphor-react-native/lib/module/icons/ArrowDownLeft' {
   import type { Icon } from 'phosphor-react-native';
   export const ArrowDownLeft: Icon;

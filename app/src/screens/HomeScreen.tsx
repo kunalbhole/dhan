@@ -24,6 +24,8 @@ import { frameworkBuckets, type FrameworkBucket } from '../lib/frameworks';
 import type { Bill } from '../lib/bills';
 import { CATEGORY_ICONS } from '../lib/categoryIcons';
 import { getBills, subscribeToBills } from '../lib/billsStore';
+import { getGoals, subscribeToGoals } from '../lib/goalsStore';
+import { computeSummary } from '../lib/insights';
 import { formatIndianNumber, formatTime } from '../lib/format';
 import { currentMonthLabel, daysLeftInMonth, daysUntil, formatShortDate, isThisMonth } from '../lib/dateRange';
 import { getMonthlyIncome, getFramework, DEFAULT_FRAMEWORK } from '../lib/account';
@@ -82,6 +84,7 @@ function HomeScreen({ navigation }: Props) {
   const [uncatTxns, setUncatTxns] = useState<StoredTransaction[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [bills, setBills] = useState<Bill[]>(getBills());
+  const [goals, setGoals] = useState(getGoals());
   const [income, setIncome] = useState<number | null>(null);
   const [framework, setFrameworkId] = useState(DEFAULT_FRAMEWORK);
   const buckets = frameworkBuckets(framework);
@@ -89,6 +92,7 @@ function HomeScreen({ navigation }: Props) {
   const recentTxns = allTxns.slice(0, 4);
 
   useEffect(() => subscribeToBills(() => setBills([...getBills()])), []);
+  useEffect(() => subscribeToGoals(() => setGoals([...getGoals()])), []);
 
   // Onboarding's own choices — reloaded on every focus (not just mount) so
   // a value changed elsewhere (e.g. a future "edit income" screen) shows
@@ -138,6 +142,10 @@ function HomeScreen({ navigation }: Props) {
   const balanceIn = income ?? 0;
   const balanceOut = budgetSpentTotal;
   const balance = balanceIn - balanceOut;
+  const weekRecap = computeSummary(allTxns, 'week');
+  const goalsSaved = goals.reduce((s, g) => s + g.saved, 0);
+  const goalsTarget = goals.reduce((s, g) => s + g.target, 0);
+  const goalsPct = goalsTarget > 0 ? Math.round((goalsSaved / goalsTarget) * 100) : 0;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bgSurface }} edges={['top', 'bottom']}>
@@ -328,12 +336,15 @@ function HomeScreen({ navigation }: Props) {
           )}
         </Card>
 
-        {/* Insights teaser */}
-        <InsightsTeaser onPress={() => stubNav('insights')} />
+        {/* Insights teaser — real this-week spend + delta vs last week
+            (computeSummary), not insights.jsx's hardcoded ₹8,210/-12%. */}
+        <InsightsTeaser spent={weekRecap.spent} deltaPct={weekRecap.deltaPct} onPress={() => navigation.navigate('Insights')} />
 
-        {/* Savings goals */}
-        <SectionHeader title="Savings goals" onSeeAll={() => stubNav('goals')} />
-        <Card onPress={() => stubNav('goals')} style={{ padding: spacing.s3 + 2, marginBottom: spacing.s4, flexDirection: 'row', alignItems: 'center', gap: spacing.s3 }}>
+        {/* Savings goals — real persisted goals (goalsStore.ts); a fresh
+            install has none yet, so this reflects that instead of the
+            reference's hardcoded "4 active goals · ₹4,47,000 saved". */}
+        <SectionHeader title="Savings goals" onSeeAll={() => navigation.navigate('Goals')} />
+        <Card onPress={() => navigation.navigate('Goals')} style={{ padding: spacing.s3 + 2, marginBottom: spacing.s4, flexDirection: 'row', alignItems: 'center', gap: spacing.s3 }}>
           <View
             style={{
               width: 44,
@@ -348,9 +359,11 @@ function HomeScreen({ navigation }: Props) {
           </View>
           <View style={{ flex: 1 }}>
             <AppText weight="semibold" style={{ fontSize: 14 }}>
-              4 active goals
+              {goals.length > 0 ? `${goals.length} active goal${goals.length === 1 ? '' : 's'}` : 'No goals yet'}
             </AppText>
-            <AppText style={{ fontSize: 12, color: colors.fg3, marginTop: 2 }}>₹4,47,000 saved · 37% to ₹12L target</AppText>
+            <AppText style={{ fontSize: 12, color: colors.fg3, marginTop: 2 }}>
+              {goals.length > 0 ? `₹${goalsSaved.toLocaleString('en-IN')} saved · ${goalsPct}% to ₹${goalsTarget.toLocaleString('en-IN')} target` : 'Set a target for something you’re saving toward'}
+            </AppText>
           </View>
           <CaretRightIcon size={16} color={colors.fg3} />
         </Card>

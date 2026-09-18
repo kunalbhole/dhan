@@ -20,7 +20,16 @@ export function monthYearLabel(ts: number): string {
   return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+export const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// Monday of the week containing `now` — insights.jsx's own "This week"
+// range starts on Monday (its sample range label is "Mon 31 Aug – today"),
+// not a rolling 7-day window.
+export function startOfWeek(now: Date = new Date()): Date {
+  const day = now.getDay(); // 0=Sun..6=Sat
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday);
+}
 
 // "Sep 2026" — BudgetScreen's month-picker label shape. There's no
 // per-month transaction history yet, so callers use this for "the one real
