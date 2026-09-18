@@ -1,5 +1,5 @@
 import { useEffect, useState, type ComponentType } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Image, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { XIcon } from 'phosphor-react-native/lib/module/icons/X';
@@ -210,11 +210,18 @@ function SettingsScreen({ navigation }: Props) {
             Sharma"; falls back to a generic placeholder until it's set. */}
         <Card onPress={() => navigation.navigate('Profile')} style={{ padding: spacing.s4, marginBottom: spacing.s4 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-            <View style={{ width: 48, height: 48, borderRadius: radii.pill, backgroundColor: colors.gold, alignItems: 'center', justifyContent: 'center' }}>
-              <AppText weight="bold" style={{ fontSize: 18, color: colors.navy }}>
-                {profile.name.trim()[0]?.toUpperCase() ?? '?'}
-              </AppText>
-            </View>
+            {profile.avatarUri ? (
+              <Image
+                source={{ uri: profile.avatarUri }}
+                style={{ width: 48, height: 48, borderRadius: radii.pill }}
+              />
+            ) : (
+              <View style={{ width: 48, height: 48, borderRadius: radii.pill, backgroundColor: colors.gold, alignItems: 'center', justifyContent: 'center' }}>
+                <AppText weight="bold" style={{ fontSize: 18, color: colors.navy }}>
+                  {profile.name.trim()[0]?.toUpperCase() ?? '?'}
+                </AppText>
+              </View>
+            )}
             <View style={{ flex: 1, minWidth: 0 }}>
               <AppText weight="semibold" style={{ fontSize: 15, color: colors.navy }}>
                 {profile.name || 'Add your name'}

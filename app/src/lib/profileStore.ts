@@ -1,9 +1,3 @@
-// AsyncStorage-persisted profile fields — same hydrate/subscribe/notify
-// shape as billsStore.ts/goalsStore.ts. Unlike the reference's
-// ProfileEditScreen (which seeds every field with a hardcoded sample
-// value), nothing here is onboarding-collected except the name typed at
-// sign-up (see SignUpScreen.tsx's confirmCode, which persists it here) —
-// every other field starts blank until the user actually fills it in.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY = 'dhan-profile';
@@ -13,9 +7,10 @@ export interface Profile {
   email: string;
   dob: string;
   city: string;
+  avatarUri?: string | null;
 }
 
-const EMPTY: Profile = { name: '', email: '', dob: '', city: '' };
+const EMPTY: Profile = { name: '', email: '', dob: '', city: '', avatarUri: null };
 
 let profile: Profile = { ...EMPTY };
 let hydrated = false;
@@ -63,6 +58,12 @@ export function subscribeToProfile(listener: Listener): () => void {
 export function setProfileField<K extends keyof Profile>(key: K, value: Profile[K]): void {
   if (profile[key] === value) return;
   profile = { ...profile, [key]: value };
+  notify();
+  persist();
+}
+
+export function setAvatarUri(uri: string | null): void {
+  profile = { ...profile, avatarUri: uri };
   notify();
   persist();
 }
