@@ -162,7 +162,13 @@ function SettingsScreen({ navigation }: Props) {
     return subscribeToTransactionsChanged(load);
   }, []);
 
-  const appLockValue = appLock.enabled ? (appLock.method === 'faceid' ? 'Face ID' : 'PIN') : 'None';
+  const appLockValue = appLock.enabled
+    ? appLock.method === 'faceid'
+      ? 'Face ID'
+      : appLock.method === 'fingerprint'
+        ? 'Fingerprint'
+        : 'PIN'
+    : 'None';
   const smsSourcesValue = senderCount === 0 ? 'None yet' : `${senderCount} source${senderCount === 1 ? '' : 's'}`;
   const notifOnCount = Object.values(notifPrefs).filter(Boolean).length;
   const notifValue = `${notifOnCount} on`;

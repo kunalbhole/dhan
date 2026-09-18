@@ -1,14 +1,8 @@
-// AsyncStorage-persisted app-lock preference — same hydrate/subscribe
-// shape as billsStore.ts/goalsStore.ts/profileStore.ts. This persists the
-// user's real on/off + method choice; it does not enforce a lock screen
-// (no biometrics library is installed in this app yet — see
-// AppLockScreen.tsx's own comment), so it's honestly a preference today,
-// not yet a working gate.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const STORAGE_KEY = 'dhan-app-lock';
 
-export type LockMethod = 'faceid' | 'pin';
+export type LockMethod = 'faceid' | 'fingerprint' | 'pin';
 
 export interface AppLockSettings {
   enabled: boolean;
