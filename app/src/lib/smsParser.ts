@@ -1,18 +1,5 @@
-// ─── Dhan · bank-SMS transaction parser ─────────────────────
-// Ported from `Dhan App 2/sms-parser.js` — regex, merchant detection, and
-// category hints are unchanged, just typed and exported as ES modules
-// instead of attached to `window`. Do not "clean up" the patterns here
-// without re-checking against the prototype; they're already tuned against
-// real bank SMS formats.
-//
-// parseSms(text) -> array of transaction objects (0, 1 or 2 entries).
-// A spend SMS yields one entry. A forex-markup SMS yields its own separate
-// "Forex Fee" entry — never merged into the spend it belongs to (V1: no linking).
-
 const INR_TOKENS = ['INR', 'RS', 'RS.', '₹', 'INR.'];
 
-// ISO-4217 codes we accept as "foreign". A closed list keeps stray uppercase
-// words (UPI, OTP, VPA, NEFT) from being read as currencies.
 const FOREIGN_CODES = [
   'USD', 'EUR', 'GBP', 'AED', 'SGD', 'AUD', 'CAD', 'CHF', 'JPY', 'CNY',
   'HKD', 'THB', 'MYR', 'NZD', 'SAR', 'QAR', 'KWD', 'OMR', 'BHD', 'LKR',
@@ -22,18 +9,42 @@ const FOREIGN_CODES = [
 
 const CURRENCY_SYMBOLS: Record<string, string> = { $: 'USD', '€': 'EUR', '£': 'GBP', '¥': 'JPY' };
 
-// currency-before-amount  (USD 45.00 / Rs. 3,842 / ₹1,850 / $45)
 const CUR_FIRST = /(₹|\$|€|£|¥|\b(?:INR|Inr|inr|RS|Rs|rs)\b\.?|\b[A-Z]{3}\b)\s*\.?\s*([\d][\d,]*(?:\.\d{1,2})?)/g;
-// amount-before-currency  (45.00 USD / 3,842 INR)
 const CUR_LAST = /([\d][\d,]*(?:\.\d{1,2})?)\s*(\b[A-Z]{3}\b|\b(?:Rs|rs)\b|₹)/g;
 
 const FEE_RE =
   /(forex|foreign\s+currency|cross[-\s]?currency|currency\s+conversion)[^.;]{0,24}?(markup|conversion|txn)?\s*(fee|charge|charges|mark[-\s]?up)|markup\s+fee|mark[-\s]?up\s+charge/i;
-const CREDIT_RE = /\b(credited|received|refund(?:ed)?|deposited|reversed)\b/i;
-const DEBIT_RE = /\b(debited|spent|paid|withdrawn|charged|purchase)\b/i;
+const REFUND_RE = /\b(refund|refunded|reversed|reversal|cashback)\b/i;
+const CREDIT_RE = /\b(credited|received|refund(?:ed)?|deposited|reversed|cashback|credited to)\b/i;
+const DEBIT_RE = /\b(debited|spent|paid|withdrawn|charged|purchase|sent to)\b/i;
+const SELF_RE = /\b(self transfer|own account|internal transfer|a\/c transfer)\b/i;
 
-const MERCHANT_RE =
-  /\b(?:at|to|towards|for)\s+([A-Z0-9][A-Za-z0-9&'._\- ]{1,38}?)(?=\s+(?:on|via|using|dated|ref|txn|from|with|a\/c)\b|[.,;!]|$)/;
+// Expanded merchant extraction patterns for Indian UPI, netbanking & card SMS
+const MERCHANT_PATTERNS = [
+  /\b(?:at|to|towards|for|paid to|info:)\s+([A-Z0-9][A-Za-z0-9&'._\- ]{1,38}?)(?=\s+(?:on|via|using|dated|ref|txn|from|with|a\/c|upi|val|\.)\b|[.,;!]|$)/i,
+  /\b(?:vpa|upi\/)\s*([A-Za-z0-9._\- ]{2,30})/i,
+];
+
+// Known brand keyword fallback dictionary
+const BRAND_KEYWORDS: Array<[string, RegExp]> = [
+  ['Zomato', /zomato/i],
+  ['Swiggy', /swiggy/i],
+  ['Zepto', /zepto/i],
+  ['Blinkit', /blinkit/i],
+  ['BigBasket', /bigbasket/i],
+  ['CRED Club', /cred/i],
+  ['LazyPay', /lazypay/i],
+  ['Google Cloud', /google\s*cloud/i],
+  ['Netflix', /netflix/i],
+  ['Spotify', /spotify/i],
+  ['Amazon', /amazon/i],
+  ['Flipkart', /flipkart/i],
+  ['Airtel', /airtel/i],
+  ['Jio', /jio/i],
+  ['Uber', /uber/i],
+  ['Ola', /ola/i],
+  ['Cult.fit', /cult\.fit|cultfit/i],
+];
 
 const CATEGORY_HINTS: Array<[string, RegExp]> = [
   ['food', /swiggy|zomato|domino|starbucks|blue tokai|cafe|coffee|restaurant|eatery|kfc|mcdonald/i],
@@ -43,7 +54,7 @@ const CATEGORY_HINTS: Array<[string, RegExp]> = [
   ['bills', /airtel|jio|vodafone|bses|tata power|broadband|fiber|electricity|gas|recharge/i],
   ['ent', /netflix|spotify|prime video|bookmyshow|hotstar|youtube|pvr|inox/i],
   ['health', /apollo|pharmeasy|1mg|hospital|clinic|pharmacy|diagnostic/i],
-  ['income', /salary|payroll/i],
+  ['income', /salary|payroll|refund|reversal|cashback/i],
 ];
 
 const toNumber = (s: string): number => parseFloat(String(s).replace(/,/g, ''));
@@ -58,7 +69,6 @@ export interface ScannedAmount {
   inr: boolean;
 }
 
-// Every currency+amount pair in the message, in text order.
 function scanAmounts(text: string): ScannedAmount[] {
   const found: ScannedAmount[] = [];
   const push = (code: string, amount: number, index: number) => {
@@ -73,7 +83,6 @@ function scanAmounts(text: string): ScannedAmount[] {
     if (code === 'INR' || code === 'RS' || FOREIGN_CODES.includes(code)) {
       push(code === 'RS' ? 'INR' : code, toNumber(m[2]), m.index);
     }
-    // a lone ISO code we don't know (UPI, VPA, OTP…) is skipped by design
   }
   CUR_LAST.lastIndex = 0;
   while ((m = CUR_LAST.exec(text))) {
@@ -89,11 +98,22 @@ function scanAmounts(text: string): ScannedAmount[] {
 }
 
 function guessMerchant(text: string): string | null {
-  const m = text.match(MERCHANT_RE);
-  if (!m) return null;
-  const name = m[1].trim().replace(/\s{2,}/g, ' ').replace(/[.\s]+$/, '');
-  if (!name || /^\d+$/.test(name) || name.length < 2) return null;
-  return name;
+  // Check brand dictionary first
+  for (const [brand, re] of BRAND_KEYWORDS) {
+    if (re.test(text)) return brand;
+  }
+
+  // Check merchant regex patterns
+  for (const pattern of MERCHANT_PATTERNS) {
+    const m = text.match(pattern);
+    if (m && m[1]) {
+      const name = m[1].trim().replace(/\s{2,}/g, ' ').replace(/[.\s]+$/, '').replace(/\d{6,}$/, '');
+      if (name && !/^\d+$/.test(name) && name.length >= 2) {
+        return name;
+      }
+    }
+  }
+  return null;
 }
 
 function guessCategory(text: string, merchant: string | null, isCredit: boolean): string {
@@ -122,7 +142,6 @@ export interface ParsedTxn {
 function baseTxn(): ParsedTxn {
   return {
     id: null, m: null, s: '', a: 0, c: 'other',
-    // foreign-currency schema — always present, inert for domestic txns
     isForeignTransaction: false,
     originalCurrency: null,
     originalAmount: null,
@@ -141,7 +160,7 @@ function buildFeeTxn(text: string, amounts: ScannedAmount[]): ParsedTxn | null {
     s: 'Forex Fee · auto-detected',
     a: -Math.abs(inr.amount),
     c: 'forex-fee',
-    categoryLocked: true, // fixed category — not user-editable
+    categoryLocked: true,
     inrAmount: Math.abs(inr.amount),
     isForeignTransaction: !!fx,
     originalCurrency: fx ? fx.code : null,
@@ -155,17 +174,22 @@ function buildSpendTxn(text: string, amounts: ScannedAmount[]): ParsedTxn | null
   const fx = amounts.find((a) => !a.inr);
   if (!inr && !fx) return null;
 
-  const isCredit = CREDIT_RE.test(text) && !DEBIT_RE.test(text);
+  const isRefund = REFUND_RE.test(text);
+  const isCredit = (CREDIT_RE.test(text) && !DEBIT_RE.test(text)) || isRefund;
+  const isSelf = SELF_RE.test(text);
   const merchant = guessMerchant(text);
-  // Settled value is always the INR leg when the bank gives one; a foreign-only
-  // alert (rare, pre-settlement) falls back to the foreign amount.
   const settled = inr ? inr.amount : fx!.amount;
+
+  let subtitle = 'Auto-detected from SMS';
+  if (isSelf) subtitle = 'Self-transfer · Internal';
+  else if (isRefund) subtitle = 'Refund · auto-detected';
+  else if (isCredit) subtitle = 'Income · auto-detected';
 
   const txn: ParsedTxn = {
     ...baseTxn(),
     id: nextId('txn'),
     m: merchant,
-    s: isCredit ? 'Income · auto-detected' : 'Auto-detected from SMS',
+    s: subtitle,
     a: isCredit ? Math.abs(settled) : -Math.abs(settled),
     c: guessCategory(text, merchant, isCredit),
     raw: text,
@@ -185,8 +209,6 @@ function parseSms(text: string): ParsedTxn[] {
   const amounts = scanAmounts(text);
   if (!amounts.length) return [];
 
-  // A markup-fee SMS becomes its own entry. It is NOT linked to the spend
-  // that caused it (V1) and never folded into another amount.
   if (FEE_RE.test(text)) {
     const fee = buildFeeTxn(text, amounts);
     return fee ? [fee] : [];

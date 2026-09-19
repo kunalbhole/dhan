@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { CheckIcon } from 'phosphor-react-native/lib/module/icons/Check';
 import { ArrowRightIcon } from 'phosphor-react-native/lib/module/icons/ArrowRight';
 import AppText from '../../components/AppText';
 import Button from '../../components/Button';
+import Field from '../../components/Field';
 import ScreenHeader from '../../components/ScreenHeader';
 import { colors, radii, shadows, spacing, typography } from '../../theme';
+import { scanAndProcessInbox } from '../../lib/smsPipeline';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'LinkBank'>;
@@ -19,20 +21,19 @@ interface Bank {
   short: string;
 }
 
-// Bank brand colors are fixed external-identity colors (not part of the
-// app's own design system, unlike category/semantic accents), so they stay
-// local here rather than in theme.ts — same treatment as the Dhan/Google
-// logos. Ported verbatim from screens-extra-auth.jsx's LinkBankScreen.
-const BANKS: Bank[] = [
+const ALL_BANKS: Bank[] = [
   { id: 'hdfc', name: 'HDFC Bank', color: '#004C8F', short: 'HD' },
   { id: 'icici', name: 'ICICI Bank', color: '#F37920', short: 'IC' },
   { id: 'axis', name: 'Axis Bank', color: '#97144D', short: 'AX' },
   { id: 'sbi', name: 'State Bank', color: '#22409A', short: 'SB' },
   { id: 'kotak', name: 'Kotak Mahindra', color: '#ED1A3B', short: 'KM' },
   { id: 'yes', name: 'Yes Bank', color: '#00518F', short: 'YS' },
+  { id: 'indus', name: 'IndusInd Bank', color: '#88001B', short: 'IN' },
+  { id: 'pnb', name: 'Punjab National Bank', color: '#A11B20', short: 'PN' },
+  { id: 'bob', name: 'Bank of Baroda', color: '#F26522', short: 'BO' },
+  { id: 'lazypay', name: 'LazyPay', color: '#20C997', short: 'LZ' },
+  { id: 'cred', name: 'CRED Pay', color: '#141C41', short: 'CR' },
 ];
-
-const SCAN_DELAY_MS = 700;
 
 function Spinner() {
   const rotation = useRef(new Animated.Value(0)).current;
@@ -56,24 +57,21 @@ function Spinner() {
 }
 
 function LinkBankScreen({ navigation }: Props) {
-  const [linked, setLinked] = useState<string[]>(['hdfc']);
+  const [query, setQuery] = useState('');
+  const [linked, setLinked] = useState<string[]>(['hdfc', 'icici']);
   const [scanning, setScanning] = useState(false);
-  const scanTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => () => {
-    if (scanTimer.current) clearTimeout(scanTimer.current);
-  }, []);
+  const filtered = ALL_BANKS.filter(b => b.name.toLowerCase().includes(query.trim().toLowerCase()));
 
-  const toggle = (id: string) => {
+  const toggle = async (id: string) => {
     if (linked.includes(id)) {
       setLinked(l => l.filter(x => x !== id));
       return;
     }
     setScanning(true);
-    scanTimer.current = setTimeout(() => {
-      setLinked(l => [...l, id]);
-      setScanning(false);
-    }, SCAN_DELAY_MS);
+    await scanAndProcessInbox(200);
+    setLinked(l => [...l, id]);
+    setScanning(false);
   };
 
   const goNext = () => navigation.navigate('IncomeSetup');
@@ -97,59 +95,62 @@ function LinkBankScreen({ navigation }: Props) {
         </AppText>
         <AppText style={styles.subtitle}>Dhan reads SMS only — no logins, no OTPs. Add the ones you use.</AppText>
 
-        <View style={styles.grid}>
-          {BANKS.map(bank => {
-            const isLinked = linked.includes(bank.id);
-            return (
-              <Pressable
-                key={bank.id}
-                onPress={() => toggle(bank.id)}
-                style={[
-                  styles.card,
-                  { borderColor: isLinked ? colors.navy : colors.borderSubtle },
-                  isLinked && shadows.md,
-                ]}
-              >
-                <View style={styles.cardTopRow}>
-                  <View style={[styles.badge, { backgroundColor: bank.color }]}>
-                    <AppText weight="semibold" style={styles.badgeText}>
-                      {bank.short}
-                    </AppText>
-                  </View>
-                  {isLinked && (
-                    <View style={styles.checkBadge}>
-                      <CheckIcon size={12} color={colors.bgBase} weight="fill" />
+        <Field placeholder="Search banks or wallets…" value={query} onChangeText={setQuery} />
+
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing.s4, paddingTop: spacing.s3 }}>
+          <View style={styles.grid}>
+            {filtered.map(bank => {
+              const isLinked = linked.includes(bank.id);
+              return (
+                <Pressable
+                  key={bank.id}
+                  onPress={() => toggle(bank.id)}
+                  style={[
+                    styles.card,
+                    { borderColor: isLinked ? colors.navy : colors.borderSubtle },
+                    isLinked && shadows.md,
+                  ]}
+                >
+                  <View style={styles.cardTopRow}>
+                    <View style={[styles.badge, { backgroundColor: bank.color }]}>
+                      <AppText weight="semibold" style={styles.badgeText}>
+                        {bank.short}
+                      </AppText>
                     </View>
-                  )}
-                </View>
-                <AppText weight="semibold" style={styles.bankName}>
-                  {bank.name}
-                </AppText>
-                <AppText weight="semibold" style={[styles.bankStatus, { color: isLinked ? colors.income : colors.fg3 }]}>
-                  {isLinked ? 'Linked · SMS detected' : 'Tap to link'}
-                </AppText>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        {scanning && (
-          <View style={styles.scanRow}>
-            <Spinner />
-            <AppText style={styles.scanText}>Scanning recent SMS…</AppText>
+                    {isLinked && (
+                      <View style={styles.checkBadge}>
+                        <CheckIcon size={12} color={colors.bgBase} weight="fill" />
+                      </View>
+                    )}
+                  </View>
+                  <AppText weight="semibold" style={styles.bankName}>
+                    {bank.name}
+                  </AppText>
+                  <AppText weight="semibold" style={[styles.bankStatus, { color: isLinked ? colors.income : colors.fg3 }]}>
+                    {isLinked ? 'Linked · SMS detected' : 'Tap to link'}
+                  </AppText>
+                </Pressable>
+              );
+            })}
           </View>
-        )}
 
-        <View style={styles.summaryBanner}>
-          <AppText style={styles.summaryText}>
-            <AppText weight="bold" style={styles.summaryBold}>
-              {linked.length} linked.
-            </AppText>{' '}
-            Add more anytime in Settings.
-          </AppText>
-        </View>
+          {scanning && (
+            <View style={styles.scanRow}>
+              <Spinner />
+              <AppText style={styles.scanText}>Scanning recent SMS…</AppText>
+            </View>
+          )}
 
-        <View style={styles.spacerFixed} />
+          <View style={styles.summaryBanner}>
+            <AppText style={styles.summaryText}>
+              <AppText weight="bold" style={styles.summaryBold}>
+                {linked.length} linked.
+              </AppText>{' '}
+              Add more anytime in Settings.
+            </AppText>
+          </View>
+        </ScrollView>
+
         <Button
           variant="primary"
           full
@@ -188,7 +189,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.fg2,
     lineHeight: 21,
-    marginBottom: 18,
+    marginBottom: 12,
   },
   grid: {
     flexDirection: 'row',
@@ -271,9 +272,6 @@ const styles = StyleSheet.create({
   summaryBold: {
     fontSize: typography.scale.bodySm.fontSize,
     color: colors.fg1,
-  },
-  spacerFixed: {
-    height: spacing.s3,
   },
 });
 

@@ -140,7 +140,8 @@ function HomeScreen({ navigation }: Props) {
   const budgetSpentTotal = monthTxns.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
   const budgetLeft = Math.max(0, budgetCapTotal - budgetSpentTotal);
   const budgetPct = budgetCapTotal > 0 ? Math.min(100, Math.round((budgetSpentTotal / budgetCapTotal) * 100)) : 0;
-  const balanceIn = income ?? 0;
+  const monthCredits = monthTxns.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+  const balanceIn = monthCredits > 0 ? monthCredits : (income ?? 75000);
   const balanceOut = budgetSpentTotal;
   const balance = balanceIn - balanceOut;
   const weekRecap = computeSummary(allTxns, 'week');

@@ -55,6 +55,7 @@ function ExportDataScreen({ navigation }: Props) {
       }
       const csv = buildTransactionsCsv(filtered);
       await shareTransactionsCsv(csv);
+      showToast('Export ready: CSV generated');
     } finally {
       setExporting(false);
     }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { DotsThreeIcon } from 'phosphor-react-native/lib/module/icons/DotsThree';
@@ -132,7 +132,11 @@ function TxnDetailScreen({ route, navigation }: Props) {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bgSurface }} edges={['top', 'bottom']}>
-      <ScreenHeader
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <ScreenHeader
         title="Transaction"
         onBack={() => navigation.goBack()}
         right={
@@ -332,8 +336,8 @@ function TxnDetailScreen({ route, navigation }: Props) {
                     placeholder="tag name"
                     placeholderTextColor={colors.fg3}
                     style={{
-                      width: 96,
-                      height: 26,
+                      minWidth: 100,
+                      height: 28,
                       borderRadius: radii.pill,
                       borderWidth: 1,
                       borderColor: colors.gold,
@@ -454,6 +458,7 @@ function TxnDetailScreen({ route, navigation }: Props) {
         onClose={() => setSplitOpen(false)}
         txn={{ merchant, amount: Math.abs(t.amount), category: t.category, day }}
       />
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

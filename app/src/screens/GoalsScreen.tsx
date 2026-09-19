@@ -6,11 +6,13 @@ import { PlusIcon } from 'phosphor-react-native/lib/module/icons/Plus';
 import { PlusCircleIcon } from 'phosphor-react-native/lib/module/icons/PlusCircle';
 import { PencilSimpleIcon } from 'phosphor-react-native/lib/module/icons/PencilSimple';
 import { TargetIcon } from 'phosphor-react-native/lib/module/icons/Target';
+import { CheckCircleIcon } from 'phosphor-react-native/lib/module/icons/CheckCircle';
+import { ShieldCheckIcon } from 'phosphor-react-native/lib/module/icons/ShieldCheck';
 import AppText from '../components/AppText';
 import Card from '../components/Card';
 import ScreenHeader from '../components/ScreenHeader';
 import EditGoalSheet from '../components/EditGoalSheet';
-import { colors, radii, spacing } from '../theme';
+import { colors, radii, shadows, spacing } from '../theme';
 import { GOAL_ICONS } from '../lib/goalIcons';
 import type { Goal, GoalIconId } from '../lib/goals';
 import { addGoal, deleteGoal, getGoals, subscribeToGoals, updateGoal } from '../lib/goalsStore';
@@ -21,10 +23,16 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Goals'>;
 
 function GoalsScreen({ navigation }: Props) {
   const [goals, setGoals] = useState<Goal[]>(getGoals());
+  const [tab, setTab] = useState<'active' | 'completed'>('active');
   const [editing, setEditing] = useState<Goal | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
   useEffect(() => subscribeToGoals(() => setGoals([...getGoals()])), []);
+
+  const activeGoals = goals.filter(g => g.saved < g.target);
+  const completedGoals = goals.filter(g => g.saved >= g.target);
+
+  const displayed = tab === 'active' ? activeGoals : completedGoals;
 
   const totalSaved = goals.reduce((s, g) => s + g.saved, 0);
   const totalTarget = goals.reduce((s, g) => s + g.target, 0);
@@ -58,7 +66,7 @@ function GoalsScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bgSurface }} edges={['top', 'bottom']}>
       <ScreenHeader
-        title="Savings goals"
+        title="Savings & Goals"
         onBack={() => navigation.goBack()}
         right={
           <Pressable
@@ -71,9 +79,10 @@ function GoalsScreen({ navigation }: Props) {
         }
       />
       <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.s4, paddingBottom: spacing.s6 }}>
+        {/* Total Summary Header */}
         <View style={{ backgroundColor: colors.navy, borderRadius: radii.cardLg, padding: spacing.s5, marginBottom: spacing.s4, overflow: 'hidden' }}>
           <AppText weight="bold" style={{ fontSize: 11, color: colors.fgOnDark, opacity: 0.7, letterSpacing: 0.1 }}>
-            Saved across all goals
+            Saved across all goals &amp; policies
           </AppText>
           <AppText weight="bold" style={{ fontSize: 30, color: colors.fgOnDark, marginTop: 4, fontVariant: ['tabular-nums'] }}>
             ₹{totalSaved.toLocaleString('en-IN')}
@@ -86,22 +95,47 @@ function GoalsScreen({ navigation }: Props) {
           </View>
         </View>
 
-        <AppText weight="medium" style={{ fontSize: 11, color: colors.fg3, letterSpacing: 0.1, marginHorizontal: 4, marginBottom: spacing.s2 }}>
-          Active · {goals.length}
-        </AppText>
+        {/* Tab Toggle: Active vs Completed */}
+        <View style={{ flexDirection: 'row', gap: spacing.s2, backgroundColor: colors.bgSurface, borderRadius: radii.control, padding: 4, marginBottom: spacing.s4 }}>
+          <Pressable
+            onPress={() => setTab('active')}
+            style={[
+              { flex: 1, height: 36, borderRadius: radii.input, alignItems: 'center', justifyContent: 'center', backgroundColor: tab === 'active' ? colors.bgElevated : 'transparent' },
+              tab === 'active' ? shadows.card : null,
+            ]}
+          >
+            <AppText weight="semibold" style={{ fontSize: 13, color: tab === 'active' ? colors.navy : colors.fg3 }}>
+              Active ({activeGoals.length})
+            </AppText>
+          </Pressable>
 
-        {goals.length === 0 ? (
+          <Pressable
+            onPress={() => setTab('completed')}
+            style={[
+              { flex: 1, height: 36, borderRadius: radii.input, alignItems: 'center', justifyContent: 'center', backgroundColor: tab === 'completed' ? colors.bgElevated : 'transparent' },
+              tab === 'completed' ? shadows.card : null,
+            ]}
+          >
+            <AppText weight="semibold" style={{ fontSize: 13, color: tab === 'completed' ? colors.navy : colors.fg3 }}>
+              Achieved ({completedGoals.length})
+            </AppText>
+          </Pressable>
+        </View>
+
+        {displayed.length === 0 ? (
           <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-            <TargetIcon size={40} color={colors.fg3} />
+            {tab === 'active' ? <TargetIcon size={40} color={colors.fg3} /> : <CheckCircleIcon size={40} color={colors.income} />}
             <AppText weight="medium" style={{ fontSize: 15, color: colors.fg2, marginTop: spacing.s3, textAlign: 'center' }}>
-              No goals yet
+              {tab === 'active' ? 'No active goals' : 'No completed goals yet'}
             </AppText>
             <AppText style={{ fontSize: 13, color: colors.fg3, marginTop: 6, textAlign: 'center', lineHeight: 19, paddingHorizontal: spacing.s5 }}>
-              Set a target for something you're saving toward — an emergency fund, a trip, anything.
+              {tab === 'active'
+                ? 'Set a target for an emergency fund, insurance premium, or travel fund.'
+                : 'Achieved goals and fully paid policies will appear here.'}
             </AppText>
           </View>
         ) : (
-          goals.map(g => {
+          displayed.map(g => {
             const Icon = GOAL_ICONS[g.icon as GoalIconId] ?? GOAL_ICONS.target;
             const pct = g.target > 0 ? (g.saved / g.target) * 100 : 0;
             return (
@@ -165,7 +199,7 @@ function GoalsScreen({ navigation }: Props) {
         >
           <PlusCircleIcon size={18} color={colors.fg2} />
           <AppText weight="semibold" style={{ fontSize: 13, color: colors.fg2 }}>
-            New savings goal
+            New savings goal or policy
           </AppText>
         </Pressable>
       </ScrollView>
