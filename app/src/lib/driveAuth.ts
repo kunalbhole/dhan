@@ -23,6 +23,7 @@ export interface DriveAccount {
   id: string;
   email: string;
   name: string | null;
+  photo: string | null;
 }
 
 // Tries a silent sign-in first (a previously-granted session, common on
@@ -59,6 +60,6 @@ export async function getDriveAccessToken(): Promise<string> {
   return accessToken;
 }
 
-function toAccount(data: { user: { id: string; email: string; name: string | null } }): DriveAccount {
-  return { id: data.user.id, email: data.user.email, name: data.user.name };
+function toAccount(data: { user: { id: string; email: string; name: string | null; photo: string | null } }): DriveAccount {
+  return { id: data.user.id, email: data.user.email, name: data.user.name, photo: data.user.photo };
 }

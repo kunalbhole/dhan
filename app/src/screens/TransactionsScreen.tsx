@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { FunnelIcon } from 'phosphor-react-native/lib/module/icons/Funnel';
@@ -24,7 +24,7 @@ import { CATEGORY_ICONS } from '../lib/categoryIcons';
 import { frameworkBuckets } from '../lib/frameworks';
 import { formatDay, formatTime } from '../lib/format';
 import { showToast } from '../lib/toast';
-import { getRecentTransactions, subscribeToTransactionsChanged, type StoredTransaction } from '../lib/db';
+import { getRecentTransactionsSync, subscribeToTransactionsChanged, type StoredTransaction } from '../lib/db';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Transactions'>;
@@ -86,8 +86,42 @@ function txnMeta(row: StoredTransaction): string {
   return `${row.subtitle} · ${formatTime(row.timestamp)}`;
 }
 
+// A transaction that arrives while this screen is open (subscribeToTransactionsChanged
+// firing from a live SMS parse) gets this long enough to slide/fade into place
+// before the Overview cards below catch up to the new total — see the
+// txns/overviewTxns split in TransactionsScreen.
+const NEW_ROW_ANIM_MS = 350;
+
+function EnteringRow({ children }: { children: React.ReactNode }) {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, { toValue: 1, duration: NEW_ROW_ANIM_MS, useNativeDriver: true }).start();
+  }, [anim]);
+
+  return (
+    <Animated.View
+      style={{
+        opacity: anim,
+        transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [-12, 0] }) }],
+      }}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
 function TransactionsScreen({ navigation }: Props) {
-  const [txns, setTxns] = useState<StoredTransaction[]>([]);
+  // Seeded synchronously from SQLite (getRecentTransactionsSync, not the
+  // async getRecentTransactions) so the very first render already has real
+  // data — no [] -> flash-of-empty-state -> real-data cycle on open.
+  const [txns, setTxns] = useState<StoredTransaction[]>(() => getRecentTransactionsSync(500));
+  // Overview's own totals lag `txns` by NEW_ROW_ANIM_MS when a *new*
+  // transaction lands live, so the row visibly animates in before the
+  // income/expense/net figures jump to match — see the load() below.
+  const [overviewTxns, setOverviewTxns] = useState<StoredTransaction[]>(txns);
+  const [newIds, setNewIds] = useState<Set<number>>(() => new Set());
+  const knownIdsRef = useRef<Set<number>>(new Set(txns.map(t => t.id)));
   const [filter, setFilter] = useState('all');
   const [sub, setSub] = useState<string | null>(null);
   const [manualCats, setManualCats] = useState<string[]>([]);
@@ -96,10 +130,43 @@ function TransactionsScreen({ navigation }: Props) {
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [appliedFilters, setAppliedFilters] = useState<TxnFilters>({ kind: 'all', cats: [], range: 'This month' });
 
+  // Fires on every insert/update/delete anywhere in the app (the SMS
+  // pipeline in particular) while this screen is mounted. `txns` updates
+  // immediately so the new row renders (and, via `newIds`, animates in);
+  // `overviewTxns` — and so the Overview cards — only catches up once that
+  // animation has had time to finish. No initial call here: `txns` is
+  // already seeded synchronously above with whatever's in SQLite right now.
   useEffect(() => {
-    const load = () => getRecentTransactions(500).then(setTxns);
-    load();
-    return subscribeToTransactionsChanged(load);
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const load = () => {
+      const list = getRecentTransactionsSync(500);
+      if (!alive) return;
+
+      const addedIds = list.filter(t => !knownIdsRef.current.has(t.id)).map(t => t.id);
+      knownIdsRef.current = new Set(list.map(t => t.id));
+      setTxns(list);
+
+      if (addedIds.length === 0) {
+        setOverviewTxns(list);
+        return;
+      }
+
+      setNewIds(new Set(addedIds));
+      timer = setTimeout(() => {
+        if (!alive) return;
+        setOverviewTxns(list);
+        setNewIds(new Set());
+      }, NEW_ROW_ANIM_MS);
+    };
+
+    const unsubscribe = subscribeToTransactionsChanged(load);
+    return () => {
+      alive = false;
+      if (timer) clearTimeout(timer);
+      unsubscribe();
+    };
   }, []);
 
   // Hardcoded to the default framework, same simplification as HomeScreen
@@ -138,7 +205,7 @@ function TransactionsScreen({ navigation }: Props) {
   // SAVE_CATS/DEBT split) so "Total expenses" doesn't double-count money
   // that actually went to investing or paying down debt — those get their
   // own stat cards instead.
-  const ovTxns = useMemo(() => txns.filter(t => isInRange(t.timestamp, ovRange)), [txns, ovRange]);
+  const ovTxns = useMemo(() => overviewTxns.filter(t => isInRange(t.timestamp, ovRange)), [overviewTxns, ovRange]);
   const isSaving = (t: StoredTransaction) => t.amount < 0 && SAVE_CATS.includes(t.category);
   const isDebt = (t: StoredTransaction) => t.amount < 0 && DEBT_CATS.includes(t.category);
   const ovIncome = ovTxns.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
@@ -341,20 +408,26 @@ function TransactionsScreen({ navigation }: Props) {
                 {day}
               </AppText>
               <Card style={{ paddingHorizontal: spacing.s4, paddingVertical: 4 }}>
-                {items.map((t, i) => (
-                  <TxnRow
-                    key={t.id}
-                    merchant={t.merchant ?? 'Unknown'}
-                    meta={txnMeta(t)}
-                    amount={t.amount}
-                    cat={t.category}
-                    isForeign={t.isForeignTransaction}
-                    currency={t.originalCurrency ?? undefined}
-                    originalAmount={t.originalAmount ?? undefined}
-                    last={i === items.length - 1}
-                    onPress={() => navigation.navigate('TxnDetail', { transaction: t })}
-                  />
-                ))}
+                {items.map((t, i) => {
+                  const row = (
+                    <TxnRow
+                      merchant={t.merchant ?? 'Unknown'}
+                      meta={txnMeta(t)}
+                      amount={t.amount}
+                      cat={t.category}
+                      isForeign={t.isForeignTransaction}
+                      currency={t.originalCurrency ?? undefined}
+                      originalAmount={t.originalAmount ?? undefined}
+                      last={i === items.length - 1}
+                      onPress={() => navigation.navigate('TxnDetail', { transaction: t })}
+                    />
+                  );
+                  return newIds.has(t.id) ? (
+                    <EnteringRow key={t.id}>{row}</EnteringRow>
+                  ) : (
+                    <View key={t.id}>{row}</View>
+                  );
+                })}
               </Card>
             </View>
           ))

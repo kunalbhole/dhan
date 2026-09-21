@@ -174,9 +174,7 @@ function LinkedAccountsScreen({ navigation }: Props) {
 
       {/* Link Another Account Button */}
       <Pressable
-        onPress={() => {
-          showToast('Select your bank to scan SMS');
-        }}
+        onPress={() => navigation.navigate('LinkBank')}
         style={{
           width: '100%',
           marginTop: spacing.s1,

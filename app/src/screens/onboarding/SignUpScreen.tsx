@@ -9,7 +9,7 @@ import Field from '../../components/Field';
 import ScreenHeader from '../../components/ScreenHeader';
 import GoogleIcon from '../../assets/GoogleIcon';
 import { colors, radii, spacing, typography } from '../../theme';
-import { setProfileNameIfEmpty } from '../../lib/profileStore';
+import { setAvatarUri, setProfileNameIfEmpty } from '../../lib/profileStore';
 import { signInToGoogle } from '../../lib/driveAuth';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 
@@ -90,6 +90,9 @@ function SignUpScreen({ navigation }: Props) {
       if (!driveAcc) return;
       if (driveAcc.name) {
         await setProfileNameIfEmpty(driveAcc.name);
+      }
+      if (driveAcc.photo) {
+        setAvatarUri(driveAcc.photo);
       }
       goNext();
     } catch (e) {

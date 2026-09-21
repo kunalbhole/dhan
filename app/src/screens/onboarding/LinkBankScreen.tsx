@@ -74,7 +74,7 @@ function LinkBankScreen({ navigation }: Props) {
     setScanning(false);
   };
 
-  const goNext = () => navigation.navigate('IncomeSetup');
+  const goNext = () => navigation.goBack();
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>

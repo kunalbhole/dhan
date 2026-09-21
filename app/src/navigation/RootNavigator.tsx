@@ -103,7 +103,7 @@ function RootNavigator() {
         <Stack.Screen name="Onboarding" component={OnboardingScreen} />
         <Stack.Screen name="SignUp" component={SignUpScreen} />
         <Stack.Screen name="Permissions" component={PermissionsScreen} />
-        <Stack.Screen name="LinkBank" component={LinkBankScreen} />
+        <Stack.Screen name="LinkBank" component={LinkBankScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="IncomeSetup" component={IncomeSetupScreen} />
         <Stack.Screen name="Framework" component={FrameworkScreen} />
         <Stack.Screen name="Home" component={HomeScreen} />

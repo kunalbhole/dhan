@@ -12,7 +12,20 @@
           "package_name": "com.dhanapp"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "31872242503-d540132q92v3hhg7rbkmh0dpf95hj7pv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dhanapp",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "31872242503-af42n0vh2n9qlg7796eo8f22ks9sr53c.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyADu4IlT-dXEbtT3TYCkE0fT_Z25Gc8pbg"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "31872242503-af42n0vh2n9qlg7796eo8f22ks9sr53c.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

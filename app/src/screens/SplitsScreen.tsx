@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { CheckCircleIcon } from 'phosphor-react-native/lib/module/icons/CheckCircle';
-import { StarIcon } from 'phosphor-react-native/lib/module/icons/Star';
 import AppHeader from '../components/AppHeader';
 import AppText from '../components/AppText';
 import Card from '../components/Card';
@@ -44,14 +42,6 @@ function SplitsScreen({ navigation }: Props) {
 
   // If Dhan Plus is active, show ALL friends and unlimited groups!
   const list = plan.isPlus ? friends : friends.slice(0, 4);
-
-  const formattedExpiry = plan.trialExpiresAt
-    ? new Date(plan.trialExpiresAt).toLocaleDateString('en-IN', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      })
-    : null;
 
   const handleTab = (id: TabId) => {
     if (id === 'split') return;
@@ -114,43 +104,6 @@ function SplitsScreen({ navigation }: Props) {
               No groups yet. Tap + New group above to split a trip, flat, or dinner party.
             </AppText>
           </Card>
-        )}
-
-        {/* Plus Membership Status or Upgrade Card */}
-        {plan.isPlus ? (
-          <Card style={{ backgroundColor: colors.navy, padding: spacing.s4, marginTop: spacing.s4 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <StarIcon size={18} color={colors.gold} weight="fill" />
-                <AppText weight="bold" style={{ fontSize: 15, color: colors.fgOnDark }}>
-                  Dhan Plus Active
-                </AppText>
-              </View>
-              <View style={{ backgroundColor: colors.gold, paddingHorizontal: 8, paddingVertical: 2, borderRadius: radii.pill }}>
-                <AppText weight="bold" style={{ fontSize: 10, color: colors.navy }}>
-                  3-MONTH TRIAL
-                </AppText>
-              </View>
-            </View>
-            <AppText style={{ fontSize: 12.5, color: colors.goldSoft, marginTop: 6 }}>
-              {plan.mandateBank || 'UPI Auto-Mandate'} active · First auto-debit on {formattedExpiry}
-            </AppText>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 }}>
-              <CheckCircleIcon size={14} color={colors.income} weight="fill" />
-              <AppText style={{ fontSize: 11.5, color: colors.fgOnDark, opacity: 0.8 }}>
-                Unlimited groups, AI insights, and multi-currency unlocked
-              </AppText>
-            </View>
-          </Card>
-        ) : (
-          <Pressable onPress={() => navigation.navigate('PlusPaywall', { note: 'Track unlimited split groups with Dhan Plus' })} style={{ backgroundColor: colors.navy, borderRadius: radii.card, padding: spacing.s4, marginTop: spacing.s4 }}>
-            <AppText weight="semibold" style={{ fontSize: 15, color: colors.fgOnDark }}>
-              Upgrade to track unlimited friends
-            </AppText>
-            <AppText weight="medium" style={{ fontSize: 13, color: colors.goldSoft, marginTop: 4 }}>
-              Try Dhan Plus free for 3 months
-            </AppText>
-          </Pressable>
         )}
       </ScrollView>
 

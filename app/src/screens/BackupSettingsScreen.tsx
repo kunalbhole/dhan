@@ -17,7 +17,7 @@ import Toggle from '../components/Toggle';
 import { colors, spacing } from '../theme';
 import { formatRelativeTime } from '../lib/format';
 import { showToast } from '../lib/toast';
-import { signInToGoogle, signOutOfGoogle, type DriveAccount } from '../lib/driveAuth';
+import { signInSilentlyToGoogle, signInToGoogle, signOutOfGoogle, type DriveAccount } from '../lib/driveAuth';
 import { runBackup } from '../lib/backupService';
 import {
   getBackupSettings,
@@ -33,10 +33,11 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 type Props = NativeStackScreenProps<RootStackParamList, 'BackupSettings'>;
 
 // New screen, no reference to port — free for every user (no Dhan Plus
-// gating, unlike Budget's "Edit categories"). Sign-in here is its own
-// independent Google OAuth session (src/lib/driveAuth.ts), separate from
-// SignUpScreen's own "Continue with Google" (a different, unrelated,
-// still-in-progress workstream).
+// gating, unlike Budget's "Edit categories"). Sign-in here shares the same
+// GoogleSignin session/scopes as SignUpScreen's "Continue with Google"
+// (src/lib/driveAuth.ts), so if the user already granted access there, the
+// silent check below picks it up automatically instead of asking them to
+// pick a Google account again from scratch.
 function BackupSettingsScreen({ navigation }: Props) {
   const [account, setAccount] = useState<DriveAccount | null>(null);
   const [settings, setSettings] = useState<BackupSettings | null>(null);
@@ -45,6 +46,16 @@ function BackupSettingsScreen({ navigation }: Props) {
 
   useEffect(() => {
     getBackupSettings().then(setSettings);
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    signInSilentlyToGoogle().then(signedIn => {
+      if (alive && signedIn) setAccount(signedIn);
+    });
+    return () => {
+      alive = false;
+    };
   }, []);
 
   useEffect(() => subscribeToBackupStatus(() => setStatus(getBackupStatus())), []);

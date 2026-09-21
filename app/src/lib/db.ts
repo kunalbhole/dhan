@@ -155,7 +155,12 @@ export async function getAllTransactions(): Promise<StoredTransaction[]> {
   return res.rows.map((r: Record<string, unknown>) => mapRowToTransaction(r));
 }
 
-export async function getRecentTransactions(limit = 100): Promise<StoredTransaction[]> {
+// executeSync really is synchronous (op-sqlite, not a Promise-wrapped
+// native call) — exposed directly so a screen can seed its initial state
+// with real data on first render instead of starting from [] and waiting
+// a microtask for getRecentTransactions' .then() to land, which is what
+// produced the empty-state flash on TransactionsScreen's first mount.
+export function getRecentTransactionsSync(limit = 100): StoredTransaction[] {
   const database = getDatabase();
   const res = database.executeSync(
     'SELECT * FROM transactions ORDER BY timestamp DESC LIMIT ?',
@@ -163,6 +168,10 @@ export async function getRecentTransactions(limit = 100): Promise<StoredTransact
   );
   if (!res.rows) return [];
   return res.rows.map((r: Record<string, unknown>) => mapRowToTransaction(r));
+}
+
+export async function getRecentTransactions(limit = 100): Promise<StoredTransaction[]> {
+  return getRecentTransactionsSync(limit);
 }
 
 export async function getUncategorisedTransactions(limit = 100): Promise<StoredTransaction[]> {

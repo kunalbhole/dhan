@@ -47,9 +47,24 @@ export async function getFramework(): Promise<string> {
   return v ?? DEFAULT_FRAMEWORK;
 }
 
+// Whether the user actually has (and is willing to grant) READ_CONTACTS —
+// set from PermissionsScreen's real permission result, not just the
+// toggle's on-screen state, so a later "is Contacts on?" read here matches
+// what Android actually granted rather than what was requested.
+const CONTACTS_KEY = 'dhan-contacts-enabled';
+
+export async function setContactsEnabled(enabled: boolean): Promise<void> {
+  await AsyncStorage.setItem(CONTACTS_KEY, enabled ? '1' : '0');
+}
+
+export async function getContactsEnabled(): Promise<boolean> {
+  const v = await AsyncStorage.getItem(CONTACTS_KEY);
+  return v !== '0';
+}
+
 // A full local reset — sign-out clears these alongside the onboarded
 // flag so a relaunch's onboarding starts genuinely fresh, not carrying
 // over the previous account's income/framework.
 export async function clearUserPrefs(): Promise<void> {
-  await AsyncStorage.removeMany([INCOME_KEY, FRAMEWORK_KEY]);
+  await AsyncStorage.removeMany([INCOME_KEY, FRAMEWORK_KEY, CONTACTS_KEY]);
 }

@@ -37,13 +37,9 @@ import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
-// Reference-hardcoded sample figures (screens-main.jsx's HomeScreen) — this
-// app has no user-profile storage yet, so the display name/greeting stay
-// as-is. The balance/budget totals below are real now: income comes from
+// The balance/budget totals below are real: income comes from
 // IncomeSetupScreen, the framework from FrameworkScreen (both persisted in
 // src/lib/account.ts), and spend comes from this month's real transactions.
-const USER_NAME = 'Priya';
-const GREETING = 'Morning';
 
 interface QuickAction {
   id: string;
@@ -153,34 +149,25 @@ function HomeScreen({ navigation }: Props) {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bgSurface }} edges={['top', 'bottom']}>
       <AppHeader onMenu={() => navigation.navigate('Settings')} onSearch={() => navigation.navigate('Search')} onNotify={() => navigation.navigate('Notifications')} />
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.s4, paddingTop: spacing.s2, paddingBottom: spacing.s6 }}>
-        {/* Greeting — the "+" that used to sit here moved into AppHeader
-            (GlobalAddSheet.tsx), shared across every screen. */}
-        <View style={{ paddingVertical: spacing.s2, paddingHorizontal: 4, marginBottom: spacing.s2 }}>
-          <AppText style={{ fontSize: 13, color: colors.fg3 }}>{GREETING},</AppText>
-          <AppText weight="bold" style={{ fontSize: 20 }}>
-            {USER_NAME} 👋
-          </AppText>
-        </View>
-
-        {/* Balance hero */}
+      <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.s4, paddingTop: spacing.s4, paddingBottom: spacing.s6 }}>
+        {/* Balance hero — greeting removed so the balance hero takes the top position */}
         <View
           style={[
             {
               backgroundColor: colors.navy,
               borderRadius: radii.cardLg,
-              padding: spacing.s5,
-              marginBottom: spacing.s4,
+              padding: spacing.s6,
+              marginBottom: spacing.s5,
             },
             shadows.md,
           ]}
         >
-          <AppText weight="semibold" style={{ fontSize: 11, color: colors.fgOnDark, opacity: 0.7 }}>
+          <AppText weight="semibold" style={{ fontSize: 11, color: colors.fgOnDark, opacity: 0.7, letterSpacing: 0.2 }}>
             Balance · {currentMonthLabel()}
           </AppText>
-          <AppText weight="bold" style={{ fontSize: 34, color: colors.fgOnDark, marginTop: 6, marginBottom: 14, fontVariant: ['tabular-nums'] }}>
+          <AppText weight="bold" style={{ fontSize: 36, color: colors.fgOnDark, marginTop: spacing.s2, marginBottom: spacing.s4, fontVariant: ['tabular-nums'] }}>
             {balance < 0 ? '−' : ''}₹{formatIndianNumber(balance)}
-            <AppText weight="bold" style={{ fontSize: 18, color: colors.fgOnDark, opacity: 0.6 }}>
+            <AppText weight="bold" style={{ fontSize: 20, color: colors.fgOnDark, opacity: 0.6 }}>
               .00
             </AppText>
           </AppText>
@@ -191,7 +178,7 @@ function HomeScreen({ navigation }: Props) {
                 + ₹{formatIndianNumber(balanceIn)}
               </AppText>
             </View>
-            <View style={heroPillStyle('rgba(255,255,255,0.1)')}>
+            <View style={heroPillStyle('rgba(255,255,255,0.12)')}>
               <ArrowUpRightIcon size={14} color={colors.fgOnDark} />
               <AppText weight="semibold" style={{ fontSize: 12, color: colors.fgOnDark }}>
                 − ₹{formatIndianNumber(balanceOut)}
@@ -445,9 +432,9 @@ function heroPillStyle(background: string) {
   return {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    gap: spacing.s1,
+    paddingHorizontal: spacing.s3,
+    paddingVertical: spacing.s2,
     borderRadius: radii.pill,
     backgroundColor: background,
   };

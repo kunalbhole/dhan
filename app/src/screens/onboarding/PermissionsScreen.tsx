@@ -1,5 +1,5 @@
 import { ComponentType, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { PermissionsAndroid, Platform, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AddressBookIcon } from 'phosphor-react-native/lib/module/icons/AddressBook';
@@ -14,6 +14,7 @@ import Toggle from '../../components/Toggle';
 import { colors, radii, spacing, typography } from '../../theme';
 import { requestSmsPermission } from '../../native/sms';
 import { scanAndProcessInbox } from '../../lib/smsPipeline';
+import { setContactsEnabled } from '../../lib/account';
 import type { RootStackParamList } from '../../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Permissions'>;
@@ -49,16 +50,38 @@ const ITEMS: PermItem[] = [
     id: 'contacts',
     Icon: AddressBookIcon,
     title: 'Contacts',
-    body: 'Optional — only if you split bills with friends on Dhan Plus.',
+    body: 'Match payments to people you know, so they show up in Split.',
     color: colors.catBills,
   },
 ];
+
+// Standard runtime permission (unlike SMS, which needs the custom
+// SmsModule for its listener/reader) — PermissionsAndroid handles this
+// directly. Mirrors ProfileScreen.tsx's requestGalleryPermission.
+async function requestContactsPermission(): Promise<boolean> {
+  if (Platform.OS !== 'android') return true;
+  try {
+    const granted = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.READ_CONTACTS,
+      {
+        title: 'Contacts Permission',
+        message: 'Dhan uses your contacts to match payments to people you know for Split.',
+        buttonNeutral: 'Ask Me Later',
+        buttonNegative: 'Cancel',
+        buttonPositive: 'OK',
+      },
+    );
+    return granted === PermissionsAndroid.RESULTS.GRANTED;
+  } catch {
+    return false;
+  }
+}
 
 function PermissionsScreen({ navigation }: Props) {
   const [perms, setPerms] = useState<Record<PermId, boolean>>({
     sms: true,
     notif: true,
-    contacts: false,
+    contacts: true,
   });
   const [loading, setLoading] = useState(false);
 
@@ -71,11 +94,16 @@ function PermissionsScreen({ navigation }: Props) {
           await scanAndProcessInbox(500);
         }
       }
+      // Denial doesn't block onboarding — it just means the persisted
+      // setting ends up OFF, matching what Android actually granted
+      // rather than what the toggle asked for.
+      const contactsGranted = perms.contacts ? await requestContactsPermission() : false;
+      await setContactsEnabled(contactsGranted);
     } catch {
       // Permission optional / continuation guaranteed
     } finally {
       setLoading(false);
-      navigation.navigate('LinkBank');
+      navigation.navigate('IncomeSetup');
     }
   };
 
