@@ -11,6 +11,7 @@ import BillsScreen from '../screens/BillsScreen';
 import BillDetailScreen from '../screens/BillDetailScreen';
 import BackupSettingsScreen from '../screens/BackupSettingsScreen';
 import SplitsScreen from '../screens/SplitsScreen';
+import MatchPeopleScreen from '../screens/MatchPeopleScreen';
 import FriendDetailScreen from '../screens/FriendDetailScreen';
 import GroupDetailScreen from '../screens/GroupDetailScreen';
 import GoalsScreen from '../screens/GoalsScreen';
@@ -66,6 +67,7 @@ export type RootStackParamList = {
   BillDetail: { bill: Bill };
   BackupSettings: undefined;
   Splits: undefined;
+  MatchPeople: undefined;
   FriendDetail: { friendId: string };
   GroupDetail: { groupId: string };
   Goals: undefined;
@@ -117,6 +119,7 @@ function RootNavigator() {
         <Stack.Screen name="BillDetail" component={BillDetailScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="BackupSettings" component={BackupSettingsScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Splits" component={SplitsScreen} />
+        <Stack.Screen name="MatchPeople" component={MatchPeopleScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="FriendDetail" component={FriendDetailScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="GroupDetail" component={GroupDetailScreen} options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="Goals" component={GoalsScreen} options={{ animation: 'slide_from_right' }} />

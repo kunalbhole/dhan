@@ -741,3 +741,9 @@ declare module 'phosphor-react-native/lib/module/icons/CheckSquareOffset' {
   export const CheckSquareOffset: Icon;
   export const CheckSquareOffsetIcon: Icon;
 }
+
+declare module 'phosphor-react-native/lib/module/icons/UserMinus' {
+  import type { Icon } from 'phosphor-react-native';
+  export const UserMinus: Icon;
+  export const UserMinusIcon: Icon;
+}

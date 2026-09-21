@@ -1,9 +1,24 @@
-// A lightweight in-memory store for friends/groups, mirroring
-// src/lib/billsStore.ts's subscribe/notify pattern. This app has no real
-// contacts integration or peer-to-peer ledger backend — FRIENDS and
-// DEFAULT_GROUPS are the reference's own hardcoded sample data
-// (screens-split.jsx), same status as SAMPLE_TXNS/UPCOMING_BILLS
-// elsewhere. Session-only: nothing here is persisted.
+// Real Split data — people and groups. Kept at this file path/API (Friend,
+// Group, GroupExpense, getFriends/getFriend/settleFriend/adjustFriendNet/
+// getGroups/etc.) so PeerRow, GroupRow, SplitSheet, SettleUpSheet,
+// CreateGroupSheet, AddGroupExpenseSheet, FriendDetailScreen and
+// GroupDetailScreen didn't need any import changes — only what's behind
+// these functions changed, from a hardcoded sample array to real data
+// derived from transactions.person_key (see db.ts) plus a real,
+// AsyncStorage-persisted split ledger and group list.
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  getPeopleCountSync,
+  getPeoplePageSync,
+  getPersonAggregateSync,
+  getPersonNetSync,
+  getPersonNetsSync,
+  getSplitTotalsSync,
+  insertSplitEntrySync,
+  subscribeToPeopleChanged,
+  type PersonAggregate,
+} from './db';
+import { formatRelativeTime } from './format';
 
 export interface Friend {
   id: string;
@@ -36,60 +51,132 @@ export interface GroupExpense {
   groupWith: { id: string; name: string; icon: string; share: number };
 }
 
-let friends: Friend[] = [
-  { id: 'rahul', name: 'Rahul Sharma', net: 2000, last: 'Goa trip · Apr 12', phone: '+91 98765 43210', hasPhoto: true },
-  { id: 'priya', name: 'Priya Kapoor', net: 1450, last: 'Dinner at Indigo · Apr 18', phone: '+91 99870 12245', hasPhoto: true },
-  { id: 'akash', name: 'Akash Mehta', net: -1200, last: 'Concert tickets · Apr 2', phone: '+91 98200 77431' },
-  { id: 'sneha', name: 'Sneha Joshi', net: -850, last: 'Grocery run · Apr 10', phone: '+91 90045 66120', hasPhoto: true },
-  { id: 'dev', name: 'Dev Anand', net: 0, last: 'Settled up · Apr 20', phone: '+91 98111 20934' },
-];
+function lastLabel(agg: PersonAggregate): string {
+  const direction = agg.lastAmount >= 0 ? '+' : '−';
+  return `₹${Math.abs(agg.lastAmount).toLocaleString('en-IN')} ${direction === '+' ? 'received' : 'paid'} · ${formatRelativeTime(agg.lastTimestamp)}`;
+}
 
-let groups: Group[] = [{ id: 'goa', name: 'Goa trip', icon: 'airplane-takeoff', members: ['rahul', 'priya', 'akash', 'sneha'] }];
+function toFriend(agg: PersonAggregate, net: number): Friend {
+  return {
+    id: agg.personKey,
+    name: agg.displayName,
+    net,
+    last: lastLabel(agg),
+    phone: '',
+  };
+}
 
-// groupId -> expenses added via AddGroupExpenseSheet during this session.
-const addedExpenses: Record<string, GroupExpense[]> = {};
+// Bounded flat list for the member-picker UIs (SplitSheet "who's in",
+// CreateGroupSheet "Add members") — those already scroll inside a
+// fixed-height sheet, so a large-but-bounded fetch is the right shape
+// there; the Split screen's own list uses getPeoplePage below instead,
+// which is genuinely incremental.
+const PICKER_LIMIT = 200;
+
+export function getFriends(): Friend[] {
+  const aggregates = getPeoplePageSync(PICKER_LIMIT, 0);
+  const nets = getPersonNetsSync(aggregates.map(a => a.personKey));
+  return aggregates.map(a => toFriend(a, nets[a.personKey] ?? 0));
+}
+
+export function getPeoplePage(page: number, pageSize: number): { people: Friend[]; total: number } {
+  const aggregates = getPeoplePageSync(pageSize, page * pageSize);
+  const nets = getPersonNetsSync(aggregates.map(a => a.personKey));
+  return { people: aggregates.map(a => toFriend(a, nets[a.personKey] ?? 0)), total: getPeopleCountSync() };
+}
+
+export function getSplitTotals(): { get: number; pay: number } {
+  return getSplitTotalsSync();
+}
+
+export function getFriend(id: string): Friend | undefined {
+  const agg = getPersonAggregateSync(id);
+  if (!agg) return undefined;
+  return toFriend(agg, getPersonNetSync(id));
+}
 
 type Listener = () => void;
 const friendListeners = new Set<Listener>();
-const groupListeners = new Set<Listener>();
-
-function notifyFriends() {
-  friendListeners.forEach(l => l());
+export function subscribeToFriends(listener: Listener): () => void {
+  friendListeners.add(listener);
+  // db.ts's people/transactions change events are what actually drive
+  // this data now — relayed straight through as a "friends changed" event.
+  const unsub = subscribeToPeopleChanged(listener);
+  return () => {
+    friendListeners.delete(listener);
+    unsub();
+  };
 }
+
+// Both Settle (SettleUpSheet) and Collect use this — either direction, a
+// settlement is just "bring the running balance to zero," recorded as a
+// real entry rather than a mutated field (see db.ts's split_entries
+// comment for why).
+export function settleFriend(id: string): void {
+  const net = getPersonNetSync(id);
+  if (net === 0) return;
+  insertSplitEntrySync({ personKey: id, kind: 'settlement', amount: -net, note: 'Settled up' });
+}
+
+// SplitSheet's real save — you fronted the expense, so each selected
+// person's net moves further in your favour by their share.
+export function adjustFriendNet(id: string, delta: number, transactionId?: number | null): void {
+  insertSplitEntrySync({ personKey: id, kind: 'split', amount: delta, transactionId: transactionId ?? null });
+}
+
+// ---------------------------------------------------------------------
+// Groups — manually created (never inferred from SMS), so a simple
+// AsyncStorage JSON blob is the right amount of persistence for them,
+// same pattern as billsStore.ts. Starts empty: no seeded "Goa trip".
+// ---------------------------------------------------------------------
+
+const GROUPS_KEY = 'dhan-groups';
+const EXPENSES_KEY = 'dhan-group-expenses';
+
+let groups: Group[] = [];
+let addedExpenses: Record<string, GroupExpense[]> = {};
+let hydrated = false;
+let hydrating: Promise<void> | null = null;
+
+const groupListeners = new Set<Listener>();
 function notifyGroups() {
   groupListeners.forEach(l => l());
 }
 
-export function getFriends(): Friend[] {
-  return friends;
+async function persistGroups(): Promise<void> {
+  await AsyncStorage.setItem(GROUPS_KEY, JSON.stringify(groups));
 }
-export function subscribeToFriends(listener: Listener): () => void {
-  friendListeners.add(listener);
-  return () => friendListeners.delete(listener);
-}
-export function getFriend(id: string): Friend | undefined {
-  return friends.find(f => f.id === id);
+async function persistExpenses(): Promise<void> {
+  await AsyncStorage.setItem(EXPENSES_KEY, JSON.stringify(addedExpenses));
 }
 
-// SettleUpSheet's confirm — a plain stored field, so (unlike group
-// balances, which are derived from an expense list) zeroing it out is a
-// real, simple, correct action. Matches the reference's own semantics
-// (Settle marks the balance closed) rather than its no-op wiring
-// (app.jsx's onConfirm only shows a toast — this actually clears it).
-export function settleFriend(id: string): void {
-  friends = friends.map(f => (f.id === id ? { ...f, net: 0, last: 'Settled up · Today' } : f));
-  notifyFriends();
+async function hydrate(): Promise<void> {
+  if (hydrated) return;
+  if (!hydrating) {
+    hydrating = Promise.all([AsyncStorage.getItem(GROUPS_KEY), AsyncStorage.getItem(EXPENSES_KEY)]).then(
+      ([rawGroups, rawExpenses]) => {
+        if (rawGroups) {
+          try {
+            groups = JSON.parse(rawGroups);
+          } catch {
+            groups = [];
+          }
+        }
+        if (rawExpenses) {
+          try {
+            addedExpenses = JSON.parse(rawExpenses);
+          } catch {
+            addedExpenses = {};
+          }
+        }
+        hydrated = true;
+        notifyGroups();
+      },
+    );
+  }
+  return hydrating;
 }
-
-// SplitSheet's real save — you fronted the expense, so each selected
-// friend's net moves further in your favour by their share. The
-// reference's own SplitSheet.onSave (app.jsx) only closes the sheet and
-// shows a toast; this actually updates the balance, same pattern as
-// AddTxnSheet/AddBillSheet elsewhere in this app.
-export function adjustFriendNet(id: string, delta: number): void {
-  friends = friends.map(f => (f.id === id ? { ...f, net: f.net + delta, last: `Split · Today` } : f));
-  notifyFriends();
-}
+hydrate();
 
 export function getGroups(): Group[] {
   return groups;
@@ -105,41 +192,25 @@ export function getGroup(id: string): Group | undefined {
 export function addGroup(group: Group): void {
   groups = [...groups, group];
   notifyGroups();
+  persistGroups();
 }
 export function updateGroup(updated: Group): void {
   groups = groups.map(g => (g.id === updated.id ? updated : g));
   notifyGroups();
+  persistGroups();
 }
 export function removeGroup(id: string): void {
   groups = groups.filter(g => g.id !== id);
+  delete addedExpenses[id];
   notifyGroups();
+  persistGroups();
+  persistExpenses();
 }
 
-// Ported verbatim from screens-group.jsx's groupExpenses — 4 deterministic
-// sample rows per group, payer rotated across "You" and the group's own
-// members so every group's history looks populated.
-export function baseGroupExpenses(group: Group): GroupExpense[] {
-  const members = group.members.map(id => getFriend(id)).filter((f): f is Friend => !!f);
-  const payer = (i: number): { id: string; name: string } => (i % 3 === 0 ? { id: 'you', name: 'You' } : members[i % members.length] || { id: 'you', name: 'You' });
-  const rows = [
-    { key: 1, m: 'Beach shack dinner', day: 'Sat · Apr 18', d: 'Apr 18', total: 4800, share: -1200, c: 'food', s: 'Dinner · UPI · 9:20 PM' },
-    { key: 2, m: 'Scooter rental', day: 'Fri · Apr 17', d: 'Apr 17', total: 2400, share: -600, c: 'transport', s: 'Rental · UPI · 11:05 AM' },
-    { key: 3, m: 'Villa booking', day: 'Thu · Apr 16', d: 'Apr 16', total: 12000, share: 3000, c: 'travel', s: 'Stay · HDFC ••4521' },
-    { key: 4, m: 'Groceries run', day: 'Thu · Apr 16', d: 'Apr 16', total: 1800, share: -450, c: 'groceries', s: 'Groceries · UPI · 6:40 PM' },
-  ];
-  return rows.map((r, i) => {
-    const by = payer(i);
-    const share = by.name === 'You' ? Math.abs(r.share) : -Math.abs(r.share);
-    return {
-      ...r,
-      id: `gx-${group.id}-${r.key}`,
-      a: -r.total,
-      share,
-      paidBy: by,
-      split: `${by.name === 'You' ? 'You' : by.name.split(' ')[0]} paid ₹${r.total.toLocaleString('en-IN')}`,
-      groupWith: { id: group.id, name: group.name, icon: group.icon, share },
-    };
-  });
+// No synthetic sample rows anymore — a new group's history is genuinely
+// empty until you add a real expense to it.
+export function baseGroupExpenses(_group: Group): GroupExpense[] {
+  return [];
 }
 
 export function getGroupExpenses(group: Group): GroupExpense[] {
@@ -149,15 +220,13 @@ export function getGroupExpenses(group: Group): GroupExpense[] {
 export function addGroupExpense(groupId: string, expense: GroupExpense): void {
   addedExpenses[groupId] = [expense, ...(addedExpenses[groupId] ?? [])];
   notifyGroups();
+  persistExpenses();
 }
 
 export interface LedgerMember extends Friend {
   net: number;
 }
 
-// Ported verbatim from screens-group.jsx's groupLedger — per-member net
-// derived from the group's expenses so the summary, per-member balances
-// and history always reconcile with each other.
 export function groupLedger(group: Group, expenses?: GroupExpense[]): LedgerMember[] {
   const members = group.members.map(id => getFriend(id)).filter((f): f is Friend => !!f);
   if (!members.length) return [];

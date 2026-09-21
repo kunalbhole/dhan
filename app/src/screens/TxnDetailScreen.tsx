@@ -456,7 +456,7 @@ function TxnDetailScreen({ route, navigation }: Props) {
       <SplitSheet
         open={splitOpen}
         onClose={() => setSplitOpen(false)}
-        txn={{ merchant, amount: Math.abs(t.amount), category: t.category, day }}
+        txn={{ id: t.id, merchant, amount: Math.abs(t.amount), category: t.category, day }}
       />
       </KeyboardAvoidingView>
     </SafeAreaView>

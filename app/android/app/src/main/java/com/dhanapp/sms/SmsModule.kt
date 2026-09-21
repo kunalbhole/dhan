@@ -149,6 +149,89 @@ class SmsModule(reactContext: ReactApplicationContext) :
     }
   }
 
+  /**
+   * Total row count of the inbox — used by the JS-side history scanner
+   * (src/lib/historyScanner.ts) purely to compute a progress percentage.
+   */
+  @ReactMethod
+  fun getSmsCount(promise: Promise) {
+    if (!hasSmsPermissions()) {
+      promise.reject("PERMISSION_DENIED", "SMS permissions not granted")
+      return
+    }
+    try {
+      val cursor = reactApplicationContext.contentResolver.query(
+        Telephony.Sms.Inbox.CONTENT_URI,
+        arrayOf(Telephony.Sms._ID),
+        null,
+        null,
+        null
+      )
+      val count = cursor?.use { it.count } ?: 0
+      promise.resolve(count)
+    } catch (e: Exception) {
+      Log.e(TAG, "getSmsCount error: ${e.message}", e)
+      promise.reject("READ_SMS_ERROR", e.message, e)
+    }
+  }
+
+  /**
+   * Cursor-paged read for the full-history scan, oldest-first, ordered by
+   * the inbox's own stable row id (not DATE) — so a page boundary never
+   * shifts under us if a new SMS arrives mid-scan, and "resume from where
+   * we stopped" is just "give me rows with _id > lastSeenId". `afterId`
+   * is 0 on the very first page (SMS row ids start at 1).
+   */
+  @ReactMethod
+  fun readSmsPage(afterId: Double, limit: Int, promise: Promise) {
+    if (!hasSmsPermissions()) {
+      promise.reject("PERMISSION_DENIED", "SMS permissions not granted")
+      return
+    }
+    try {
+      val maxCount = if (limit > 0) limit else 200
+      val cursor = reactApplicationContext.contentResolver.query(
+        Telephony.Sms.Inbox.CONTENT_URI,
+        arrayOf(
+          Telephony.Sms._ID,
+          Telephony.Sms.ADDRESS,
+          Telephony.Sms.BODY,
+          Telephony.Sms.DATE
+        ),
+        "${Telephony.Sms._ID} > ?",
+        arrayOf(afterId.toLong().toString()),
+        "${Telephony.Sms._ID} ASC LIMIT $maxCount"
+      )
+
+      val array = Arguments.createArray()
+      cursor?.use {
+        val idIdx = it.getColumnIndex(Telephony.Sms._ID)
+        val addressIdx = it.getColumnIndex(Telephony.Sms.ADDRESS)
+        val bodyIdx = it.getColumnIndex(Telephony.Sms.BODY)
+        val dateIdx = it.getColumnIndex(Telephony.Sms.DATE)
+
+        while (it.moveToNext()) {
+          val id = if (idIdx >= 0) it.getLong(idIdx) else 0L
+          val sender = if (addressIdx >= 0) it.getString(addressIdx) else null
+          val body = if (bodyIdx >= 0) it.getString(bodyIdx) else ""
+          val date = if (dateIdx >= 0) it.getLong(dateIdx) else System.currentTimeMillis()
+
+          val map = Arguments.createMap().apply {
+            putDouble("id", id.toDouble())
+            putString("sender", sender)
+            putString("body", body)
+            putDouble("timestamp", date.toDouble())
+          }
+          array.pushMap(map)
+        }
+      }
+      promise.resolve(array)
+    } catch (e: Exception) {
+      Log.e(TAG, "readSmsPage error: ${e.message}", e)
+      promise.reject("READ_SMS_ERROR", e.message, e)
+    }
+  }
+
   private fun startListening() {
     if (receiver != null) {
       Log.d(TAG, "startListening: already registered, skipping")

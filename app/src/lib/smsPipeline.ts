@@ -1,14 +1,17 @@
-import { RawSms, readExistingSms } from '../native/sms';
+import { RawSms, RawSmsWithId, readExistingSms } from '../native/sms';
 import { parseSms } from './smsParser';
 import { insertTransaction, InsertResult } from './db';
 import { isSenderEnabled } from './smsSourcesStore';
+import { getProfile } from './profileStore';
 
-export async function processIncomingSms(raw: RawSms): Promise<InsertResult[]> {
+export async function processIncomingSms(raw: RawSms | RawSmsWithId): Promise<InsertResult[]> {
   if (!isSenderEnabled(raw.sender)) return [];
-  const parsed = parseSms(raw.body);
+  const selfName = getProfile().name || null;
+  const parsed = parseSms(raw.body, selfName);
+  const smsId = 'id' in raw ? raw.id : null;
   const results: InsertResult[] = [];
   for (const txn of parsed) {
-    results.push(await insertTransaction(txn, raw.sender, raw.timestamp));
+    results.push(await insertTransaction(txn, raw.sender, raw.timestamp, smsId));
   }
   return results;
 }

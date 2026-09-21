@@ -13,6 +13,7 @@ import { getFriends, adjustFriendNet } from '../lib/friendsStore';
 import { showToast } from '../lib/toast';
 
 export interface SplitTxn {
+  id?: number;
   merchant: string;
   amount: number;
   category: string;
@@ -59,7 +60,7 @@ function SplitSheet({ open, onClose, onSaved, txn }: SplitSheetProps) {
 
   const save = () => {
     if (!total || sel.length === 0) return;
-    sel.forEach(id => adjustFriendNet(id, shareOf(id)));
+    sel.forEach(id => adjustFriendNet(id, shareOf(id), txn?.id ?? null));
     showToast(`Split with ${sel.length} ${sel.length === 1 ? 'person' : 'people'}`);
     onSaved?.();
     onClose();

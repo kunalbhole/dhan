@@ -5,56 +5,43 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { DotsThreeIcon } from 'phosphor-react-native/lib/module/icons/DotsThree';
 import { HandshakeIcon } from 'phosphor-react-native/lib/module/icons/Handshake';
 import { PaperPlaneTiltIcon } from 'phosphor-react-native/lib/module/icons/PaperPlaneTilt';
-import { ReceiptIcon } from 'phosphor-react-native/lib/module/icons/Receipt';
 import { ExportIcon } from 'phosphor-react-native/lib/module/icons/Export';
 import AppText from '../components/AppText';
 import Button from '../components/Button';
 import Card from '../components/Card';
+import CategoryIcon from '../components/CategoryIcon';
 import ContactAvatar from '../components/ContactAvatar';
 import IconChip from '../components/IconChip';
 import ScreenHeader from '../components/ScreenHeader';
 import BottomSheet from '../components/BottomSheet';
 import SettleUpSheet from '../components/SettleUpSheet';
+import SplitSheet, { type SplitTxn } from '../components/SplitSheet';
 import { colors, radii, spacing } from '../theme';
 import { getFriend, subscribeToFriends, type Friend } from '../lib/friendsStore';
+import { getPersonTransactionsSync, subscribeToTransactionsChanged, type StoredTransaction } from '../lib/db';
+import { formatDay, formatTime } from '../lib/format';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'FriendDetail'>;
 
-interface SplitLine {
-  id: string;
-  m: string;
-  d: string;
-  split: string;
-  share: number;
-}
-
-// Ported verbatim from screens-detail.jsx's FriendDetailScreen — 4
-// deterministic sample split lines per friend, same status as the
-// group-expense sample rows in src/lib/friendsStore.ts.
-function friendTxns(friend: Friend): SplitLine[] {
-  const owed = friend.net > 0;
-  return [
-    { id: `sp-${friend.id}-1`, m: 'Dinner at Indigo', d: 'Apr 18', split: 'You split ₹1,200', share: owed ? 450 : -320 },
-    { id: `sp-${friend.id}-2`, m: 'Grocery run', d: 'Apr 10', split: 'You covered ₹600', share: owed ? 300 : -200 },
-    { id: `sp-${friend.id}-3`, m: 'Uber to airport', d: 'Mar 24', split: 'Split 50/50', share: owed ? 450 : -330 },
-    { id: `sp-${friend.id}-4`, m: 'Cafe catch-up', d: 'Mar 12', split: 'You paid', share: owed ? 200 : -180 },
-  ];
-}
-
 function FriendDetailScreen({ route, navigation }: Props) {
   const { friendId } = route.params;
   const [friend, setFriend] = useState<Friend | undefined>(() => getFriend(friendId));
+  const [txns, setTxns] = useState<StoredTransaction[]>(() => getPersonTransactionsSync(friendId));
   const [menuOpen, setMenuOpen] = useState(false);
   const [settleOpen, setSettleOpen] = useState(false);
+  const [splitTxn, setSplitTxn] = useState<SplitTxn | null>(null);
 
   useEffect(() => subscribeToFriends(() => setFriend(getFriend(friendId))), [friendId]);
+  useEffect(
+    () => subscribeToTransactionsChanged(() => setTxns(getPersonTransactionsSync(friendId))),
+    [friendId],
+  );
 
   if (!friend) return null;
   const net = friend.net;
   const label = net > 0 ? 'Owes you' : net < 0 ? 'You owe' : 'Settled';
   const netColor = net > 0 ? colors.income : net < 0 ? colors.expense : colors.fg1;
-  const txns = friendTxns(friend);
 
   const reminderText = `Hi ${friend.name.split(' ')[0]}, just a reminder — you owe ₹${Math.abs(net).toLocaleString('en-IN')} on Dhan.`;
 
@@ -64,7 +51,7 @@ function FriendDetailScreen({ route, navigation }: Props) {
   };
   const exportHistory = () => {
     setMenuOpen(false);
-    Share.share({ message: `${friend.name} · ${txns.length} shared transactions on Dhan` }).catch(() => {});
+    Share.share({ message: `${friend.name} · ${txns.length} payments on Dhan` }).catch(() => {});
   };
 
   return (
@@ -95,6 +82,9 @@ function FriendDetailScreen({ route, navigation }: Props) {
           <AppText weight="bold" style={{ fontSize: 32, marginTop: 4, color: netColor, fontVariant: ['tabular-nums'] }}>
             ₹{Math.abs(net).toLocaleString('en-IN')}
           </AppText>
+          <AppText style={{ fontSize: 11.5, color: colors.fg3, marginTop: 4 }}>
+            Only reflects payments you&apos;ve actually split — not every payment below
+          </AppText>
         </View>
 
         <View style={{ gap: spacing.s2 }}>
@@ -110,26 +100,49 @@ function FriendDetailScreen({ route, navigation }: Props) {
 
         <View style={{ height: 20 }} />
         <AppText weight="medium" style={{ fontSize: 11, color: colors.fg3, letterSpacing: 0.1, marginHorizontal: 4, marginBottom: spacing.s2 }}>
-          History
+          Payment history · from your messages
         </AppText>
-        <Card style={{ paddingHorizontal: spacing.s4, paddingVertical: 0 }}>
-          {txns.map((t, i, arr) => (
-            <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s4, paddingVertical: spacing.s4, borderBottomWidth: i === arr.length - 1 ? 0 : 1, borderBottomColor: colors.borderSubtle }}>
-              <IconChip icon={ReceiptIcon} />
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <AppText weight="medium" style={{ fontSize: 14, color: colors.fg2 }} numberOfLines={1}>
-                  {t.m}
-                </AppText>
-                <AppText style={{ fontSize: 12, color: colors.fg3, marginTop: 2 }} numberOfLines={1}>
-                  {t.d} · {t.split}
-                </AppText>
+        {txns.length === 0 ? (
+          <Card style={{ padding: spacing.s4 }}>
+            <AppText style={{ fontSize: 13, color: colors.fg3, lineHeight: 19 }}>No payments found with {friend.name} yet.</AppText>
+          </Card>
+        ) : (
+          <Card style={{ paddingHorizontal: spacing.s4, paddingVertical: 0 }}>
+            {txns.map((t, i, arr) => (
+              <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.s4, paddingVertical: spacing.s4, borderBottomWidth: i === arr.length - 1 ? 0 : 1, borderBottomColor: colors.borderSubtle }}>
+                <CategoryIcon cat={t.category} tint />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <AppText weight="medium" style={{ fontSize: 14, color: colors.fg2 }} numberOfLines={1}>
+                    {t.merchant ?? friend.name}
+                  </AppText>
+                  <AppText style={{ fontSize: 12, color: colors.fg3, marginTop: 2 }} numberOfLines={1}>
+                    {formatDay(t.timestamp)} · {formatTime(t.timestamp)}
+                  </AppText>
+                </View>
+                <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                  <AppText weight="semibold" style={{ fontSize: 14, color: t.amount > 0 ? colors.income : colors.fg1, fontVariant: ['tabular-nums'] }}>
+                    {t.amount > 0 ? '+' : '−'}₹{Math.abs(t.amount).toLocaleString('en-IN')}
+                  </AppText>
+                  <Pressable
+                    onPress={() =>
+                      setSplitTxn({
+                        id: t.id,
+                        merchant: t.merchant ?? friend.name,
+                        amount: Math.abs(t.amount),
+                        category: t.category,
+                        day: formatDay(t.timestamp),
+                      })
+                    }
+                  >
+                    <AppText weight="semibold" style={{ fontSize: 11.5, color: colors.navy }}>
+                      Split this
+                    </AppText>
+                  </Pressable>
+                </View>
               </View>
-              <AppText weight="semibold" style={{ fontSize: 14, color: t.share > 0 ? colors.income : colors.fg1, fontVariant: ['tabular-nums'] }}>
-                {t.share > 0 ? '+' : '−'}₹{Math.abs(t.share).toLocaleString('en-IN')}
-              </AppText>
-            </View>
-          ))}
-        </Card>
+            ))}
+          </Card>
+        )}
       </ScrollView>
 
       <BottomSheet open={menuOpen} onClose={() => setMenuOpen(false)} title={friend.name}>
@@ -153,6 +166,7 @@ function FriendDetailScreen({ route, navigation }: Props) {
       </BottomSheet>
 
       <SettleUpSheet open={settleOpen} onClose={() => setSettleOpen(false)} friend={friend} />
+      <SplitSheet open={!!splitTxn} onClose={() => setSplitTxn(null)} txn={splitTxn} />
     </SafeAreaView>
   );
 }
