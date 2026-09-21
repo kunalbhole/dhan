@@ -8,4 +8,4 @@
 // Google Sign-In on Android needs the *Web* client's ID here (not the
 // Android client's) — that's not a mistake, it's how the SDK issues a
 // server-verifiable ID token even for a pure-client flow.
-export const GOOGLE_WEB_CLIENT_ID = 'REPLACE_ME.apps.googleusercontent.com';
+export const GOOGLE_WEB_CLIENT_ID = '31872242503-af42n0vh2n9qlg7796eo8f22ks9sr53c.apps.googleusercontent.com';
